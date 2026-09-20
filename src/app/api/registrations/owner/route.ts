@@ -54,32 +54,56 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Icon Player Name is required for this tournament' }, { status: 400 });
     }
 
-    // Auto-resolve or create Player record for Owner (zero duplicate user profiles)
-    let effectiveOwnerPlayerId: string | null = playerId || null;
-    if (!effectiveOwnerPlayerId) {
-      const { data: existingPlayer } = await supabase
+    // Auto-resolve or create Player record for Owner (zero duplicate user profiles & 100% valid FK)
+    let effectiveOwnerPlayerId: string | null = null;
+
+    // 1. Verify if supplied playerId exists in players table (by id or user_id)
+    if (playerId) {
+      const { data: pById } = await supabase
+        .from('players')
+        .select('id')
+        .or(`id.eq.${playerId},user_id.eq.${playerId}`)
+        .maybeSingle();
+
+      if (pById?.id) {
+        effectiveOwnerPlayerId = pById.id;
+      }
+    }
+
+    // 2. If not found by ID, lookup by contact email
+    if (!effectiveOwnerPlayerId && contactEmail) {
+      const { data: pByEmail } = await supabase
         .from('players')
         .select('id')
         .eq('email', contactEmail.toLowerCase().trim())
         .maybeSingle();
 
-      if (existingPlayer?.id) {
-        effectiveOwnerPlayerId = existingPlayer.id;
-      } else {
-        const ref = 'OWNER-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-        const { data: createdPlayer } = await supabase
-          .from('players')
-          .insert({
-            registration_reference: ref,
-            full_name: ownerName.trim(),
-            email: contactEmail.toLowerCase().trim(),
-            mobile: contactPhone || '0000000000',
-          })
-          .select('id')
-          .single();
-        if (createdPlayer?.id) {
-          effectiveOwnerPlayerId = createdPlayer.id;
-        }
+      if (pByEmail?.id) {
+        effectiveOwnerPlayerId = pByEmail.id;
+      }
+    }
+
+    // 3. If still not found, create a new player profile to guarantee FK validity
+    if (!effectiveOwnerPlayerId) {
+      const ref = 'OWNER-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      const newPlayerData: any = {
+        registration_reference: ref,
+        full_name: ownerName.trim(),
+        email: contactEmail.toLowerCase().trim(),
+        mobile: contactPhone || '0000000000',
+      };
+      if (playerId) {
+        newPlayerData.user_id = playerId;
+      }
+
+      const { data: createdPlayer } = await supabase
+        .from('players')
+        .insert(newPlayerData)
+        .select('id')
+        .maybeSingle();
+
+      if (createdPlayer?.id) {
+        effectiveOwnerPlayerId = createdPlayer.id;
       }
     }
 
@@ -97,7 +121,7 @@ export async function POST(req: NextRequest) {
     const nextSlot = (currentOwnersCount || 0) + 1;
     const finalTeamName = teamName?.trim() || `Team ${ownerName.trim()}`;
 
-    // 1. Insert Team Owner Record (with fallback if new schema columns are missing on remote DB)
+    // 1. Insert Team Owner Record (with fallbacks for missing columns or FK mismatches)
     const ownerPayload: any = {
       tournament_id: tournamentId,
       player_id: effectiveOwnerPlayerId,
@@ -125,7 +149,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertErr && insertErr.message?.includes('column')) {
-      // Fallback: strip newly added schema columns if remote DB hasn't run latest SQL migration
+      // Fallback 1: strip newly added schema columns if remote DB hasn't run latest SQL migration
       delete ownerPayload.team_name;
       delete ownerPayload.team_logo_url;
       delete ownerPayload.owner_is_playing;
@@ -142,6 +166,18 @@ export async function POST(req: NextRequest) {
         .single();
       newOwner = fallbackRes.data;
       insertErr = fallbackRes.error;
+    }
+
+    if (insertErr && insertErr.message?.includes('foreign key constraint')) {
+      // Fallback 2: if player_id FK constraint fails, set player_id to null
+      ownerPayload.player_id = null;
+      const fkFallbackRes = await supabase
+        .from('team_owners')
+        .insert(ownerPayload)
+        .select()
+        .single();
+      newOwner = fkFallbackRes.data;
+      insertErr = fkFallbackRes.error;
     }
 
     if (insertErr || !newOwner) {
