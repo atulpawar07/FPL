@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
       maxTeams,
       ownerRegistrationFeeRupees,
       waitlistEnabled,
+      bannerUrl,
+      registrationEndDate,
     } = body;
 
     if (!name || name.trim().length < 2) {
@@ -67,7 +69,9 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       description: description || null,
       logo_url: logoUrl || null,
+      banner_url: bannerUrl || null,
       tournament_date: tournamentDate ? new Date(tournamentDate).toISOString() : new Date().toISOString(),
+      registration_end_date: registrationEndDate ? new Date(registrationEndDate).toISOString() : null,
       registration_fee: registrationFeePaise,
       max_players: capacityInt,
       registration_open: registrationOpen !== undefined ? Boolean(registrationOpen) : true,

@@ -12,8 +12,9 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { formatPaiseToINR, formatDate, cricketRoleLabels } from '@/lib/utils/format';
 import { DbTournament, CricketRole, BattingStyle, JerseySize } from '@/types';
-import { Trophy, Calendar, Users, ShieldAlert, CheckCircle2, ArrowRight, Upload, Image as ImageIcon, Lock } from 'lucide-react';
+import { Trophy, Calendar, Users, ShieldAlert, CheckCircle2, ArrowRight, Upload, Image as ImageIcon, Lock, Crown, Clock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { TeamOwnerRegistrationModal } from '@/components/register/TeamOwnerRegistrationModal';
 
 export default function PublicTournamentPage() {
   const params = useParams();
@@ -28,6 +29,7 @@ export default function PublicTournamentPage() {
   const [loading, setLoading] = useState(true);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isOwnerModalOpen, setIsOwnerModalOpen] = useState(false);
 
   // Form State
   const [fullName, setFullName] = useState('');
@@ -179,8 +181,32 @@ export default function PublicTournamentPage() {
             </div>
           ) : (
             <>
+              {/* Registration Deadline Banner Notice if closed */}
+              {(() => {
+                const isDeadlinePassed = tournament.registration_end_date ? new Date(tournament.registration_end_date) < new Date() : false;
+                const isClosed = !tournament.registration_open || isDeadlinePassed;
+                if (isClosed) {
+                  return (
+                    <div className="p-4 bg-rose-950/90 border border-rose-500/50 rounded-2xl text-rose-200 text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 shadow-xl">
+                      <Clock className="w-5 h-5 text-rose-400 shrink-0" />
+                      <span>
+                        Registration for <strong>{tournament.name}</strong> is <strong>CLOSED</strong>
+                        {isDeadlinePassed && tournament.registration_end_date ? ` (Registration deadline passed on ${formatDate(tournament.registration_end_date)})` : ''}.
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Tournament Header Banner Card */}
               <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-6 relative overflow-hidden">
+                {tournament.banner_url && (
+                  <div className="w-full h-44 sm:h-64 rounded-2xl overflow-hidden border border-slate-800">
+                    <img src={tournament.banner_url} alt={tournament.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
+
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shrink-0 shadow-xl">
@@ -194,7 +220,19 @@ export default function PublicTournamentPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-start md:self-auto">
+                  <div className="flex flex-col sm:flex-row items-center gap-3 self-start md:self-auto">
+                    {tournament.tournament_type === 'OWNER_BASED' && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setIsOwnerModalOpen(true)}
+                        className="border-amber-500/40 text-amber-300 hover:bg-amber-950/50"
+                        leftIcon={<Crown className="w-4 h-4 text-amber-400" />}
+                      >
+                        Register as Team Owner
+                      </Button>
+                    )}
+
                     <Badge status={tournament.registration_open ? 'ACTIVE' : 'INACTIVE'}>
                       {tournament.registration_open ? 'Registration Open' : 'Registration Closed'}
                     </Badge>
@@ -232,10 +270,10 @@ export default function PublicTournamentPage() {
 
                   <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                      Status
+                      Deadline
                     </span>
-                    <span className={isWaitlistMode ? 'text-sky-300 font-bold text-xs' : 'text-emerald-300 font-bold text-xs'}>
-                      {isWaitlistMode ? `Waitlist Active (${waitlistCount})` : `${availableSlots} Slots Open`}
+                    <span className="text-xs sm:text-sm font-bold text-amber-300">
+                      {tournament.registration_end_date ? formatDate(tournament.registration_end_date) : 'Until Capacity'}
                     </span>
                   </div>
                 </div>
@@ -496,6 +534,15 @@ export default function PublicTournamentPage() {
           )}
         </div>
       </main>
+
+      {tournament && (
+        <TeamOwnerRegistrationModal
+          isOpen={isOwnerModalOpen}
+          onClose={() => setIsOwnerModalOpen(false)}
+          tournament={tournament}
+          currentUser={currentUser}
+        />
+      )}
 
       <Footer />
     </div>

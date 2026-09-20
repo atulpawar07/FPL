@@ -79,27 +79,117 @@ function HomePageContent() {
         )}
 
         {/* HERO SECTION */}
-        <section className="relative overflow-hidden pt-8 pb-16 md:pt-16 md:pb-24 border-b border-slate-900 bg-gradient-to-b from-slate-900/80 via-slate-950 to-slate-950">
+        <section className="relative overflow-hidden pt-6 pb-12 md:pt-12 md:pb-20 border-b border-slate-900 bg-gradient-to-b from-slate-900/80 via-slate-950 to-slate-950">
           {/* Ambient Lighting Gradients */}
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-emerald-500/10 blur-[140px] pointer-events-none rounded-full" />
           <div className="absolute top-1/3 right-10 w-[300px] h-[300px] bg-teal-500/10 blur-[100px] pointer-events-none rounded-full" />
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-              {/* Left Content Column */}
-              <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-6">
+            {/* Registration Deadline Banner Notice if closed */}
+            {activeTournament && (() => {
+              const isDeadlinePassed = activeTournament.registration_end_date ? new Date(activeTournament.registration_end_date) < new Date() : false;
+              const isClosed = !activeTournament.registration_open || isDeadlinePassed;
+              if (isClosed) {
+                return (
+                  <div className="p-4 bg-rose-950/90 border border-rose-500/50 rounded-2xl text-rose-200 text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 shadow-xl">
+                    <Clock className="w-5 h-5 text-rose-400 shrink-0" />
+                    <span>
+                      Registration for <strong>{activeTournament.name}</strong> is currently <strong>CLOSED</strong>
+                      {isDeadlinePassed && activeTournament.registration_end_date ? ` (Deadline passed on ${formatDate(activeTournament.registration_end_date)})` : ''}.
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              {/* TOURNAMENT BANNER DISPLAY (Mobile top / Desktop side) */}
+              <div className="lg:col-span-6 space-y-4">
+                <div className="w-full rounded-3xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl relative group">
+                  {activeTournament?.banner_url ? (
+                    <img
+                      src={activeTournament.banner_url}
+                      alt={activeTournament.name}
+                      className="w-full h-56 sm:h-72 md:h-80 object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-56 sm:h-72 md:h-80 bg-gradient-to-tr from-slate-900 via-emerald-950 to-teal-900 p-8 flex flex-col justify-between relative overflow-hidden">
+                      <div className="absolute -right-10 -bottom-10 opacity-10">
+                        <Trophy className="w-80 h-80 text-white" />
+                      </div>
+                      <span className="px-3 py-1 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold rounded-full uppercase self-start">
+                        {activeTournament?.tournament_type === 'OWNER_BASED' ? '👑 Owner-Based League' : '🏏 Premier Championship'}
+                      </span>
+                      <div>
+                        <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+                          {activeTournament?.name || 'FairPlay Premier League'}
+                        </h2>
+                        <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                          {activeTournament?.description || 'Official Player Registration & Auction Portal'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Banner Overlay Badge */}
+                  <div className="absolute top-4 left-4 flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-full bg-slate-950/90 backdrop-blur-md border border-slate-800 text-white text-xs font-bold flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                      {activeTournament ? formatDate(activeTournament.tournament_date) : 'Coming Soon'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* MOBILE DISPLAY: ACTION BUTTONS RIGHT BELOW BANNER */}
+                <div className="block lg:hidden space-y-3">
+                  {activeTournament && (() => {
+                    const isDeadlinePassed = activeTournament.registration_end_date ? new Date(activeTournament.registration_end_date) < new Date() : false;
+                    const isClosed = !activeTournament.registration_open || isDeadlinePassed;
+
+                    if (isClosed) {
+                      return (
+                        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center text-slate-400 text-xs font-semibold">
+                          Registration Closed for this Tournament
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Link href={`/tournament/${activeTournament.id}`} className="w-full">
+                          <Button size="lg" className="w-full" leftIcon={<UserCheck className="w-5 h-5" />}>
+                            Register as Player ({feeDisplay})
+                          </Button>
+                        </Link>
+
+                        {activeTournament.tournament_type === 'OWNER_BASED' && (
+                          <Link href={`/tournament/${activeTournament.id}?type=owner`} className="w-full">
+                            <Button size="lg" variant="secondary" className="w-full border-amber-500/40 text-amber-300 hover:bg-amber-950/50" leftIcon={<Trophy className="w-5 h-5 text-amber-400" />}>
+                              Register as Team Owner
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* DESKTOP SIDE: TOURNAMENT DETAILS & REGISTRATION CTAS */}
+              <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs md:text-sm font-semibold tracking-wide">
                   <Sparkles className="w-4 h-4 text-emerald-400" />
                   <span>FairPlay Premier League Registration Portal</span>
                 </div>
 
-                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.1]">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-[1.1]">
                   {activeTournament?.name || 'FairPlay Cricket Championship'}
                 </h1>
 
-                <p className="text-sm sm:text-base md:text-lg text-slate-300 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+                <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
                   {activeTournament?.description ||
-                    'Showcase your batting, bowling, and field skills. Register online to lock in your official tournament entry.'}
+                    'Showcase your batting, bowling, and fielding skills. Register online to lock in your official tournament entry or team ownership slot.'}
                 </p>
 
                 {/* Key Metrics Quick Ribbon */}
@@ -107,7 +197,7 @@ function HomePageContent() {
                   <div className="pt-2 grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-xl mx-auto lg:mx-0">
                     <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-center sm:text-left">
                       <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                        Registration Fee
+                        Player Fee
                       </span>
                       <span className="text-lg md:text-xl font-extrabold text-emerald-400">
                         {feeDisplay}
@@ -117,96 +207,59 @@ function HomePageContent() {
                       <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
                         Tournament Date
                       </span>
-                      <span className="text-sm md:text-base font-bold text-slate-200">
+                      <span className="text-xs md:text-sm font-bold text-slate-200">
                         {formatDate(activeTournament.tournament_date)}
                       </span>
                     </div>
                     <div className="col-span-2 sm:col-span-1 bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-center sm:text-left">
                       <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                        Max Capacity
+                        Registration Deadline
                       </span>
-                      <span className="text-sm md:text-base font-bold text-slate-200">
-                        {activeTournament.max_players} Players
+                      <span className="text-xs md:text-sm font-bold text-amber-300">
+                        {activeTournament.registration_end_date ? formatDate(activeTournament.registration_end_date) : 'Until Capacity'}
                       </span>
                     </div>
                   </div>
                 )}
 
-                {/* CTA Buttons */}
-                <div className="pt-4 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-                  {activeTournament ? (
-                    <Link href={`/tournament/${activeTournament.id}`} className="w-full sm:w-auto">
-                      <Button size="lg" className="w-full sm:w-auto" rightIcon={<ArrowRight className="w-5 h-5" />}>
-                        Register Now ({feeDisplay})
-                      </Button>
-                    </Link>
-                  ) : (
-                    <Link href="/admin/login" className="w-full sm:w-auto">
-                      <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                {/* DESKTOP CTA BUTTONS */}
+                <div className="hidden lg:flex flex-col sm:flex-row items-center justify-start gap-4 pt-4">
+                  {activeTournament ? (() => {
+                    const isDeadlinePassed = activeTournament.registration_end_date ? new Date(activeTournament.registration_end_date) < new Date() : false;
+                    const isClosed = !activeTournament.registration_open || isDeadlinePassed;
+
+                    if (isClosed) {
+                      return (
+                        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 text-xs font-semibold">
+                          Registration Closed for this Tournament
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Link href={`/tournament/${activeTournament.id}`}>
+                          <Button size="lg" leftIcon={<UserCheck className="w-5 h-5" />}>
+                            Register as Player ({feeDisplay})
+                          </Button>
+                        </Link>
+
+                        {activeTournament.tournament_type === 'OWNER_BASED' && (
+                          <Link href={`/tournament/${activeTournament.id}?type=owner`}>
+                            <Button size="lg" variant="secondary" className="border-amber-500/40 text-amber-300 hover:bg-amber-950/50" leftIcon={<Trophy className="w-5 h-5 text-amber-400" />}>
+                              Register as Team Owner
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    );
+                  })() : (
+                    <Link href="/admin/login">
+                      <Button size="lg" variant="outline">
                         Admin Login to Create Tournament
                       </Button>
                     </Link>
                   )}
-                  <Link href="#how-it-works" className="w-full sm:w-auto">
-                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                      View Instructions
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-
-              {/* Right Hero Badge / Visual Card */}
-              <div className="lg:col-span-5 flex justify-center">
-                <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-slate-950 relative space-y-6">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-lg">
-                        <Trophy className="w-7 h-7" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-100 text-base">Tournament Pass</h3>
-                        <span className="text-xs text-emerald-400 font-medium">Verified Entry</span>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-1 bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold rounded-full uppercase">
-                      {activeTournament?.registration_open ? 'Open' : 'Active'}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3 text-xs sm:text-sm">
-                    <div className="flex items-center justify-between text-slate-300 py-1.5 border-b border-slate-800/60">
-                      <span className="text-slate-400 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-emerald-400" />
-                        <span>Tournament Date</span>
-                      </span>
-                      <span className="font-semibold text-white">
-                        {activeTournament ? formatDate(activeTournament.tournament_date) : 'To Be Announced'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-slate-300 py-1.5 border-b border-slate-800/60">
-                      <span className="text-slate-400 flex items-center gap-2">
-                        <UserCheck className="w-4 h-4 text-emerald-400" />
-                        <span>Eligible Categories</span>
-                      </span>
-                      <span className="font-semibold text-white">All Skill Levels</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-slate-300 py-1.5">
-                      <span className="text-slate-400 flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        <span>Registration ID</span>
-                      </span>
-                      <span className="font-mono font-bold text-emerald-400">REG-2026-XXXXX</span>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 text-xs text-slate-400 space-y-1">
-                    <span className="font-bold text-slate-200 block">Instant Confirmation</span>
-                    <p>
-                      Receive your unique registration pass and entry receipt immediately upon verification.
-                    </p>
-                  </div>
                 </div>
               </div>
             </div>

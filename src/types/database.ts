@@ -48,6 +48,8 @@ export interface DbTournament {
   max_teams?: number;
   owner_registration_fee?: number; // Integer in paise
   waitlist_enabled?: boolean;
+  banner_url?: string | null;
+  registration_end_date?: string | null;
 }
 
 export interface DbTeamOwner {

@@ -59,6 +59,8 @@ export default function AdminDashboardPage() {
   const [tWaitlistEnabled, setTWaitlistEnabled] = useState(true);
   const [tUpiId, setTUpiId] = useState('');
   const [tPaymentQrUrl, setTPaymentQrUrl] = useState('');
+  const [tBannerUrl, setTBannerUrl] = useState('');
+  const [tRegistrationEndDate, setTRegistrationEndDate] = useState('');
   const [tRegistrationOpen, setTRegistrationOpen] = useState(true);
   const [savingTournament, setSavingTournament] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -103,6 +105,8 @@ export default function AdminDashboardPage() {
     setTWaitlistEnabled(true);
     setTUpiId('');
     setTPaymentQrUrl('');
+    setTBannerUrl('');
+    setTRegistrationEndDate('');
     setTRegistrationOpen(true);
     setModalError(null);
   };
@@ -120,6 +124,8 @@ export default function AdminDashboardPage() {
     setTWaitlistEnabled(t.waitlist_enabled !== false);
     setTUpiId(t.upi_id || '');
     setTPaymentQrUrl(t.payment_qr_url || '');
+    setTBannerUrl(t.banner_url || '');
+    setTRegistrationEndDate(t.registration_end_date ? t.registration_end_date.slice(0, 10) : '');
     setTRegistrationOpen(t.registration_open);
     setIsModalOpen(true);
   };
@@ -131,6 +137,17 @@ export default function AdminDashboardPage() {
     const reader = new FileReader();
     reader.onloadend = () => {
       setTPaymentQrUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setTBannerUrl(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -149,6 +166,7 @@ export default function AdminDashboardPage() {
           name: tName,
           description: tDescription,
           tournamentDate: tDate,
+          registrationEndDate: tRegistrationEndDate,
           registrationFeeRupees: tFeeRupees,
           maxPlayers: tMaxPlayers,
           tournamentType: tType,
@@ -157,6 +175,7 @@ export default function AdminDashboardPage() {
           waitlistEnabled: tWaitlistEnabled,
           upiId: tUpiId,
           paymentQrUrl: tPaymentQrUrl,
+          bannerUrl: tBannerUrl,
           registrationOpen: tRegistrationOpen,
         }),
       });
@@ -552,6 +571,16 @@ export default function AdminDashboardPage() {
             />
 
             <Input
+              label="Registration End Date (Deadline)"
+              type="date"
+              value={tRegistrationEndDate}
+              onChange={(e) => setTRegistrationEndDate(e.target.value)}
+              helperText="After this date, registration automatically closes"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
               label="Player Registration Fee (₹ INR)"
               type="number"
               required
@@ -559,9 +588,7 @@ export default function AdminDashboardPage() {
               onChange={(e) => setTFeeRupees(parseFloat(e.target.value) || 0)}
               helperText="Fee collected via personal UPI QR"
             />
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Maximum Player Capacity"
               type="number"
@@ -571,13 +598,36 @@ export default function AdminDashboardPage() {
               onChange={(e) => setTMaxPlayers(parseInt(e.target.value, 10) || 100)}
               helperText="Player N+1 automatically enters Waitlist!"
             />
+          </div>
 
-            <Input
-              label="Admin UPI ID (Optional)"
-              value={tUpiId}
-              onChange={(e) => setTUpiId(e.target.value)}
-              placeholder="organizer@upi"
-            />
+          <Input
+            label="Admin UPI ID (Optional)"
+            value={tUpiId}
+            onChange={(e) => setTUpiId(e.target.value)}
+            placeholder="organizer@upi"
+          />
+
+          {/* Tournament Banner Image Upload */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-300 block">Tournament Banner Image</label>
+            <div className="flex flex-col sm:flex-row items-center gap-4 p-3 bg-slate-950 rounded-xl border border-slate-800">
+              {tBannerUrl ? (
+                <img src={tBannerUrl} alt="Banner Preview" className="w-full sm:w-36 h-20 object-cover rounded-lg border border-slate-700" />
+              ) : (
+                <div className="w-full sm:w-36 h-20 bg-slate-800 rounded-lg flex items-center justify-center text-slate-500 text-[10px]">
+                  No Banner Image
+                </div>
+              )}
+              <div className="flex-1">
+                <label className="cursor-pointer px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition-colors inline-block">
+                  Upload Banner Image
+                  <input type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} />
+                </label>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Shown on Home Page & Tournament details screen (Recommended: 1200x500 JPG/PNG)
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">
