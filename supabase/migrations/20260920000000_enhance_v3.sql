@@ -16,6 +16,9 @@ ALTER TABLE tournaments
   ADD COLUMN IF NOT EXISTS banner_url TEXT,
   ADD COLUMN IF NOT EXISTS registration_end_date TIMESTAMPTZ;
 
+-- Refresh Supabase PostgREST schema cache
+NOTIFY pgrst, 'reload schema';
+
 -- 2. Create Managers Table
 CREATE TABLE IF NOT EXISTS managers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
