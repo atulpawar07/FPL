@@ -99,24 +99,50 @@ export async function POST(req: NextRequest) {
     const data = validationResult.data;
     const supabaseAdmin = createAdminClient();
 
-    // Upsert player profile tied to auth_user_id
-    const { data: updatedPlayer, error } = await supabaseAdmin
+    // Upsert player profile with fallback if jersey_size or auth_user_id column is missing on remote DB
+    const playerPayload: any = {
+      auth_user_id: user.id,
+      full_name: data.fullName,
+      email: user.email!,
+      profile_image_url: data.profileImageUrl,
+      cricket_role: data.cricketRole,
+      batting_style: data.battingStyle || null,
+      jersey_size: data.jerseySize || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    let { data: updatedPlayer, error } = await supabaseAdmin
       .from('players')
-      .upsert(
-        {
-          auth_user_id: user.id,
-          full_name: data.fullName,
-          email: user.email!,
-          profile_image_url: data.profileImageUrl,
-          cricket_role: data.cricketRole,
-          batting_style: data.battingStyle || null,
-          jersey_size: data.jerseySize || null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'auth_user_id' }
-      )
+      .upsert(playerPayload, { onConflict: 'auth_user_id' })
       .select('*')
-      .single();
+      .maybeSingle();
+
+    if (error && error.message?.includes('column')) {
+      delete playerPayload.jersey_size;
+      delete playerPayload.batting_style;
+
+      const fallbackRes = await supabaseAdmin
+        .from('players')
+        .upsert(playerPayload, { onConflict: 'auth_user_id' })
+        .select('*')
+        .maybeSingle();
+
+      updatedPlayer = fallbackRes.data;
+      error = fallbackRes.error;
+    }
+
+    if (error && error.message?.includes('column')) {
+      // Mismatch on auth_user_id column as well
+      delete playerPayload.auth_user_id;
+      const emailFallbackRes = await supabaseAdmin
+        .from('players')
+        .upsert(playerPayload, { onConflict: 'email' })
+        .select('*')
+        .maybeSingle();
+
+      updatedPlayer = emailFallbackRes.data;
+      error = emailFallbackRes.error;
+    }
 
     if (error || !updatedPlayer) {
       return NextResponse.json({ error: error?.message || 'Failed to save player profile' }, { status: 500 });

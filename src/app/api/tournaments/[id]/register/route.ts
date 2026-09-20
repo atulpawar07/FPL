@@ -53,24 +53,49 @@ export async function POST(
       return NextResponse.json({ error: 'Registration for this tournament is currently closed.' }, { status: 400 });
     }
 
-    // 3. Upsert Reusable Player Profile
-    const { data: player, error: playerErr } = await supabaseAdmin
+    // 3. Upsert Reusable Player Profile (with fallback for missing columns on remote DB)
+    const playerPayload: any = {
+      auth_user_id: user.id,
+      full_name: data.fullName,
+      email: user.email!,
+      profile_image_url: data.profileImageUrl,
+      cricket_role: data.cricketRole,
+      batting_style: data.battingStyle || null,
+      jersey_size: data.jerseySize || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    let { data: player, error: playerErr } = await supabaseAdmin
       .from('players')
-      .upsert(
-        {
-          auth_user_id: user.id,
-          full_name: data.fullName,
-          email: user.email!,
-          profile_image_url: data.profileImageUrl,
-          cricket_role: data.cricketRole,
-          batting_style: data.battingStyle || null,
-          jersey_size: data.jerseySize || null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'auth_user_id' }
-      )
+      .upsert(playerPayload, { onConflict: 'auth_user_id' })
       .select('*')
-      .single();
+      .maybeSingle();
+
+    if (playerErr && playerErr.message?.includes('column')) {
+      delete playerPayload.jersey_size;
+      delete playerPayload.batting_style;
+
+      const fallbackRes = await supabaseAdmin
+        .from('players')
+        .upsert(playerPayload, { onConflict: 'auth_user_id' })
+        .select('*')
+        .maybeSingle();
+
+      player = fallbackRes.data;
+      playerErr = fallbackRes.error;
+    }
+
+    if (playerErr && playerErr.message?.includes('column')) {
+      delete playerPayload.auth_user_id;
+      const emailFallbackRes = await supabaseAdmin
+        .from('players')
+        .upsert(playerPayload, { onConflict: 'email' })
+        .select('*')
+        .maybeSingle();
+
+      player = emailFallbackRes.data;
+      playerErr = emailFallbackRes.error;
+    }
 
     if (playerErr || !player) {
       return NextResponse.json({ error: playerErr?.message || 'Failed to update player profile' }, { status: 500 });
@@ -79,10 +104,10 @@ export async function POST(
     // 4. Check for existing registration in this tournament
     const { data: existingReg } = await supabaseAdmin
       .from('registrations')
-      .select('id, registration_number, registration_status, waitlist_position')
+      .select('id, registration_number, registration_status, status, waitlist_position')
       .eq('tournament_id', tournamentId)
       .eq('player_id', player.id)
-      .single();
+      .maybeSingle();
 
     if (existingReg) {
       return NextResponse.json({
@@ -90,7 +115,7 @@ export async function POST(
         alreadyRegistered: true,
         registrationId: existingReg.id,
         registrationNumber: existingReg.registration_number,
-        status: existingReg.registration_status,
+        status: existingReg.registration_status || existingReg.status,
         waitlistPosition: existingReg.waitlist_position,
       });
     }
@@ -100,7 +125,7 @@ export async function POST(
       .from('registrations')
       .select('id', { count: 'exact', head: true })
       .eq('tournament_id', tournamentId)
-      .eq('registration_status', 'CONFIRMED');
+      .or('status.eq.CONFIRMED,registration_status.eq.CONFIRMED');
 
     const maxCapacity = tournament.max_players;
     const isRegularSlotAvailable = (confirmedCount || 0) < maxCapacity;
@@ -114,7 +139,7 @@ export async function POST(
         .from('registrations')
         .select('id', { count: 'exact', head: true })
         .eq('tournament_id', tournamentId)
-        .eq('registration_status', 'WAITING_LIST');
+        .or('status.eq.WAITING_LIST,registration_status.eq.WAITING_LIST');
 
       waitlistPosition = (currentWaitlistCount || 0) + 1;
     }
@@ -122,22 +147,40 @@ export async function POST(
     const registrationNumber = generateRegistrationReference();
 
     // 6. Insert Registration Record with Historical Snapshots
-    const { data: newRegistration, error: regErr } = await supabaseAdmin
+    const regPayload: any = {
+      tournament_id: tournamentId,
+      player_id: player.id,
+      registration_number: registrationNumber,
+      status: registrationStatus,
+      registration_status: registrationStatus,
+      registration_type: 'PLAYER',
+      waitlist_position: waitlistPosition,
+      registered_name_snapshot: data.fullName,
+      registered_role_snapshot: data.cricketRole,
+      registered_batting_style_snapshot: data.battingStyle || null,
+      registered_jersey_size_snapshot: data.jerseySize || null,
+      registered_image_snapshot: data.profileImageUrl,
+    };
+
+    let { data: newRegistration, error: regErr } = await supabaseAdmin
       .from('registrations')
-      .insert({
-        tournament_id: tournamentId,
-        player_id: player.id,
-        registration_number: registrationNumber,
-        registration_status: registrationStatus,
-        waitlist_position: waitlistPosition,
-        registered_name_snapshot: data.fullName,
-        registered_role_snapshot: data.cricketRole,
-        registered_batting_style_snapshot: data.battingStyle || null,
-        registered_jersey_size_snapshot: data.jerseySize || null,
-        registered_image_snapshot: data.profileImageUrl,
-      })
+      .insert(regPayload)
       .select('*')
       .single();
+
+    if (regErr && regErr.message?.includes('column')) {
+      delete regPayload.registered_jersey_size_snapshot;
+      delete regPayload.registered_batting_style_snapshot;
+      delete regPayload.registration_type;
+
+      const fallbackRegRes = await supabaseAdmin
+        .from('registrations')
+        .insert(regPayload)
+        .select('*')
+        .single();
+      newRegistration = fallbackRegRes.data;
+      regErr = fallbackRegRes.error;
+    }
 
     if (regErr || !newRegistration) {
       return NextResponse.json({ error: regErr?.message || 'Registration failed' }, { status: 500 });
