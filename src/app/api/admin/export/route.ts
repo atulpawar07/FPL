@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireAdmin } from '@/lib/auth/is-admin';
 
 export async function GET() {
   try {
+    await requireAdmin();
     const supabase = createAdminClient();
 
     const { data: rows, error } = await supabase.from('registrations').select(`

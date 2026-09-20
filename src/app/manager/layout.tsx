@@ -6,83 +6,86 @@ import { usePathname, useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
 import {
   Trophy,
-  LayoutDashboard,
+  Briefcase,
   Users,
-  FileText,
-  Settings,
+  CheckSquare,
+  DollarSign,
   LogOut,
   Menu,
   X,
   Loader2,
   ShieldCheck,
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function ManagerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const supabase = createClient();
+
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [adminUser, setAdminUser] = useState<{ email: string; name: string } | null>(null);
+  const [managerUser, setManagerUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
 
   useEffect(() => {
-    if (pathname === '/admin/login') {
+    if (pathname === '/manager/login') {
       setCheckingAuth(false);
       return;
     }
 
-    async function verifyAdmin() {
+    async function verifyManager() {
       try {
-        const res = await fetch('/api/admin/me');
+        const res = await fetch('/api/manager/me');
         const data = await res.json();
-        if (res.ok && data.isAdmin) {
-          setAdminUser(data.user);
+        if (res.ok && data.isManager) {
+          setManagerUser({
+            email: data.user.email,
+            name: data.user.name,
+            isAdmin: data.isAdmin,
+          });
           setCheckingAuth(false);
         } else {
-          router.replace('/admin/login');
+          router.replace('/auth/login?redirect=/manager');
         }
       } catch (err) {
-        router.replace('/admin/login');
+        router.replace('/auth/login?redirect=/manager');
       }
     }
 
-    verifyAdmin();
+    verifyManager();
   }, [pathname, router]);
 
-  // If on login page, render children directly
-  if (pathname === '/admin/login') {
+  if (pathname === '/manager/login') {
     return <>{children}</>;
   }
 
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-        <span className="text-sm font-medium">Verifying Admin Authorization...</span>
+        <Loader2 className="w-6 h-6 animate-spin text-teal-500" />
+        <span className="text-sm font-medium">Verifying Manager Authorization...</span>
       </div>
     );
   }
 
   const navItems = [
-    { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-    { label: 'Player Directory', href: '/admin/players', icon: Users },
-    { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileText },
-    { label: 'Settings', href: '/admin/settings', icon: Settings },
+    { label: 'Manager Dashboard', href: '/manager', icon: Briefcase },
   ];
 
   const handleLogout = async () => {
-    await fetch('/api/admin/login', { method: 'DELETE' }).catch(() => {});
-    router.push('/admin/login');
+    await supabase.auth.signOut();
+    router.push('/');
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row selection:bg-emerald-500 selection:text-white">
-      {/* Mobile Header Bar */}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row selection:bg-teal-500 selection:text-white">
+      {/* Mobile Header */}
       <div className="md:hidden sticky top-0 z-40 bg-slate-900 border-b border-slate-800 p-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold">
-            <Trophy className="w-4 h-4" />
+          <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center text-white font-bold">
+            <Briefcase className="w-4 h-4" />
           </div>
-          <span className="font-bold text-sm text-white">Admin Portal</span>
+          <span className="font-bold text-sm text-white">Manager Portal</span>
         </div>
         <button
           onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
@@ -92,15 +95,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </button>
       </div>
 
-      {/* Mobile Drawer Overlay */}
-      {mobileSidebarOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-30 bg-slate-950/80 backdrop-blur-sm"
-          onClick={() => setMobileSidebarOpen(false)}
-        />
-      )}
-
-      {/* Desktop Sidebar / Mobile Drawer */}
+      {/* Desktop Sidebar */}
       <aside
         className={clsx(
           'fixed md:static inset-y-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-800/80 p-5 flex flex-col justify-between transition-transform duration-300 md:translate-x-0',
@@ -108,20 +103,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       >
         <div className="space-y-6">
-          {/* Logo */}
           <div className="flex items-center gap-3 pb-4 border-b border-slate-800">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md">
-              <Trophy className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white shadow-md">
+              <Briefcase className="w-6 h-6" />
             </div>
             <div>
               <span className="font-extrabold text-base text-white block">Premier Cricket</span>
-              <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block">
-                Admin Console
+              <span className="text-[10px] text-teal-400 font-bold uppercase tracking-wider block">
+                Manager Console
               </span>
             </div>
           </div>
 
-          {/* Navigation */}
           <nav className="space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -134,7 +127,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   className={clsx(
                     'flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs sm:text-sm transition-colors',
                     isActive
-                      ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
+                      ? 'bg-teal-600/20 text-teal-400 border border-teal-500/30'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                   )}
                 >
@@ -149,15 +142,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* User Footer */}
         <div className="pt-4 border-t border-slate-800 space-y-3">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40 flex items-center justify-center font-bold text-xs shrink-0">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <div className="w-8 h-8 rounded-full bg-teal-950 text-teal-400 border border-teal-500/40 flex items-center justify-center font-bold text-xs shrink-0">
+              <Briefcase className="w-4 h-4" />
             </div>
             <div className="overflow-hidden">
               <span className="font-semibold text-xs text-white block truncate">
-                {adminUser?.name || 'Administrator'}
+                {managerUser?.name || 'Authorized Manager'}
               </span>
-              <span className="text-[10px] text-slate-400 block truncate">
-                {adminUser?.email || 'atulpawar07@gmail.com'}
+              <span className="text-[10px] text-teal-400 block font-semibold truncate">
+                Granted by Admin
               </span>
             </div>
           </div>

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Trophy, Menu, X, ShieldCheck, User, LogOut, LogIn, UserPlus } from 'lucide-react';
+import { Trophy, Menu, X, ShieldCheck, User, LogOut, LogIn, UserCheck, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase/client';
+import { ADMIN_EMAIL } from '@/lib/auth/constants';
 
 export const Header: React.FC = () => {
   const router = useRouter();
@@ -12,9 +13,11 @@ export const Header: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [displayName, setDisplayName] = useState<string>('');
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isManager, setIsManager] = useState<boolean>(false);
 
   useEffect(() => {
-    const handleUser = (user: any) => {
+    const handleUser = async (user: any) => {
       if (user) {
         setCurrentUser(user);
         const name =
@@ -24,9 +27,31 @@ export const Header: React.FC = () => {
             .replace(/[._-]/g, ' ')
             .replace(/\b\w/g, (c: string) => c.toUpperCase());
         setDisplayName(name || user.email || 'Player');
+
+        const userEmail = (user.email || '').toLowerCase();
+        if (userEmail === ADMIN_EMAIL.toLowerCase()) {
+          setIsAdmin(true);
+          setIsManager(false);
+        } else {
+          setIsAdmin(false);
+          // Check if manager
+          try {
+            const res = await fetch('/api/manager/me');
+            const data = await res.json();
+            if (res.ok && data.isManager) {
+              setIsManager(true);
+            } else {
+              setIsManager(false);
+            }
+          } catch {
+            setIsManager(false);
+          }
+        }
       } else {
         setCurrentUser(null);
         setDisplayName('');
+        setIsAdmin(false);
+        setIsManager(false);
       }
     };
 
@@ -46,6 +71,8 @@ export const Header: React.FC = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(null);
+    setIsAdmin(false);
+    setIsManager(false);
     window.location.href = '/';
   };
 
@@ -87,10 +114,21 @@ export const Header: React.FC = () => {
           >
             How It Works
           </Link>
-          <Link href="/admin/login" className="text-xs font-medium text-slate-400 hover:text-slate-200 flex items-center gap-1">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>Admin Portal</span>
-          </Link>
+
+          {/* Role-gated portal links */}
+          {isAdmin && (
+            <Link href="/admin" className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-emerald-950 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900 transition-colors flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Admin Panel</span>
+            </Link>
+          )}
+
+          {isManager && (
+            <Link href="/manager" className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-teal-950 border border-teal-500/40 text-teal-300 hover:bg-teal-900 transition-colors flex items-center gap-1.5">
+              <Briefcase className="w-4 h-4 text-teal-400" />
+              <span>Manager Panel</span>
+            </Link>
+          )}
         </nav>
 
         {/* Desktop Right Side User Profile & Logout */}
@@ -198,14 +236,28 @@ export const Header: React.FC = () => {
             >
               How It Works
             </Link>
-            <Link
-              href="/admin/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-4 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium text-sm flex items-center gap-2"
-            >
-              <ShieldCheck className="w-4 h-4 text-emerald-500" />
-              <span>Admin Portal Access</span>
-            </Link>
+
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/30 text-emerald-300 font-semibold text-sm flex items-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Admin Panel</span>
+              </Link>
+            )}
+
+            {isManager && (
+              <Link
+                href="/manager"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-teal-950/80 border border-teal-500/30 text-teal-300 font-semibold text-sm flex items-center gap-2"
+              >
+                <Briefcase className="w-4 h-4 text-teal-400" />
+                <span>Manager Panel</span>
+              </Link>
+            )}
           </div>
 
           <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">

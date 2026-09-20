@@ -26,24 +26,37 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // 1. Fetch active tournament
-    let { data: tournament } = await supabase
-      .from('tournaments')
-      .select('id, name, registration_fee, max_players, registration_open')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // 1. Fetch target tournament
+    let tournament;
+    if (body.tournamentId) {
+      const { data: t } = await supabase
+        .from('tournaments')
+        .select('id, name, registration_fee, max_players, registration_open, waitlist_enabled')
+        .eq('id', body.tournamentId)
+        .maybeSingle();
+      tournament = t;
+    }
+
+    if (!tournament) {
+      const { data: latest } = await supabase
+        .from('tournaments')
+        .select('id, name, registration_fee, max_players, registration_open, waitlist_enabled')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      tournament = latest;
+    }
 
     if (!tournament) {
       return NextResponse.json({ error: 'No active tournament found. Please ask the tournament admin to publish a tournament.' }, { status: 400 });
     }
 
-    const tournamentId = tournament.id;
-    const registrationFee = tournament.registration_fee || 50000;
-
-    if (tournament && !tournament.registration_open) {
+    if (!tournament.registration_open) {
       return NextResponse.json({ error: 'Registration for this tournament is currently closed' }, { status: 400 });
     }
+
+    const tournamentId = tournament.id;
+    const registrationFee = tournament.registration_fee || 50000;
 
     // 2. Create or find player record in database
     let playerId: string | null = null;
@@ -109,22 +122,19 @@ export async function POST(req: NextRequest) {
           .select('id')
           .single();
 
-        // Fallback for schema cache missing jersey_size column
         if (playerErr && playerErr.message?.includes('jersey_size')) {
           delete playerPayload.jersey_size;
-          const { data: retryNewPlayer, error: retryErr } = await supabase
+          const { data: retryNewPlayer } = await supabase
             .from('players')
             .insert(playerPayload)
             .select('id')
             .single();
           newPlayer = retryNewPlayer;
-          playerErr = retryErr;
         }
 
         if (newPlayer) {
           playerId = newPlayer.id;
         } else {
-          console.error('Player creation note:', playerErr?.message);
           const { data: retryPlayer } = await supabase
             .from('players')
             .select('id')
@@ -148,60 +158,110 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const registrationNumber = generateRegistrationReference();
+    if (!playerId) {
+      return NextResponse.json({ error: 'Failed to create or resolve player profile' }, { status: 500 });
+    }
 
-    // 3. Create Registration Record
-    let registrationId = registrationNumber;
-    if (tournamentId && playerId) {
-      const regPayload: any = {
-        tournament_id: tournamentId,
-        player_id: playerId,
-        registration_number: registrationNumber,
-        registration_status: 'CONFIRMED',
-        registered_name_snapshot: fullName,
-        registered_role_snapshot: cricketRole,
-        registered_batting_style_snapshot: battingStyle,
-        registered_jersey_size_snapshot: jerseySize,
-        registered_image_snapshot: profileImageUrl,
-      };
+    // Check if player is already registered for this tournament
+    const { data: existingReg } = await supabase
+      .from('registrations')
+      .select('id, registration_number, registration_status, waitlist_position')
+      .eq('tournament_id', tournamentId)
+      .eq('player_id', playerId)
+      .maybeSingle();
 
-      let { data: newReg, error: regErr } = await supabase
+    if (existingReg) {
+      return NextResponse.json({
+        success: true,
+        alreadyRegistered: true,
+        registrationId: existingReg.id,
+        registrationNumber: existingReg.registration_number,
+        registrationStatus: existingReg.registration_status,
+        waitlistPosition: existingReg.waitlist_position,
+        message: 'You are already registered for this tournament',
+      });
+    }
+
+    // 3. Create Registration Record via RPC allocate_registration_slot (or direct fallback)
+    let registrationId: string;
+    let registrationNumber: string;
+    let registrationStatus: string = 'CONFIRMED';
+    let waitlistPosition: number | null = null;
+
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('allocate_registration_slot', {
+      p_tournament_id: tournamentId,
+      p_player_id: playerId,
+      p_registered_name_snapshot: fullName,
+      p_registered_role_snapshot: cricketRole,
+      p_registered_batting_style_snapshot: battingStyle,
+      p_registered_jersey_size_snapshot: jerseySize,
+      p_registered_image_snapshot: profileImageUrl,
+    });
+
+    if (!rpcErr && rpcData && rpcData.length > 0) {
+      registrationId = rpcData[0].registration_id;
+      registrationNumber = rpcData[0].registration_number;
+      registrationStatus = rpcData[0].registration_status;
+      waitlistPosition = rpcData[0].waitlist_position;
+    } else {
+      // Direct Insert Fallback if RPC function not created in DB yet
+      registrationNumber = generateRegistrationReference();
+
+      // Check current capacity
+      const { count: confirmedCount } = await supabase
         .from('registrations')
-        .insert(regPayload)
+        .select('id', { count: 'exact', head: true })
+        .eq('tournament_id', tournamentId)
+        .eq('registration_status', 'CONFIRMED');
+
+      if ((confirmedCount || 0) < tournament.max_players) {
+        registrationStatus = 'CONFIRMED';
+        waitlistPosition = null;
+      } else {
+        registrationStatus = 'WAITING_LIST';
+        const { count: waitlistCount } = await supabase
+          .from('registrations')
+          .select('id', { count: 'exact', head: true })
+          .eq('tournament_id', tournamentId)
+          .eq('registration_status', 'WAITING_LIST');
+        waitlistPosition = (waitlistCount || 0) + 1;
+      }
+
+      const { data: newReg, error: regErr } = await supabase
+        .from('registrations')
+        .insert({
+          tournament_id: tournamentId,
+          player_id: playerId,
+          registration_number: registrationNumber,
+          registration_status: registrationStatus,
+          waitlist_position: waitlistPosition,
+          registered_name_snapshot: fullName,
+          registered_role_snapshot: cricketRole,
+          registered_batting_style_snapshot: battingStyle,
+          registered_jersey_size_snapshot: jerseySize,
+          registered_image_snapshot: profileImageUrl,
+        })
         .select('id')
         .single();
 
-      // Fallback for schema cache missing registered_jersey_size_snapshot column
-      if (regErr && regErr.message?.includes('jersey_size')) {
-        delete regPayload.registered_jersey_size_snapshot;
-        const { data: retryReg, error: retryRegErr } = await supabase
-          .from('registrations')
-          .insert(regPayload)
-          .select('id')
-          .single();
-        newReg = retryReg;
-        regErr = retryRegErr;
-      }
-
-      if (newReg) {
-        registrationId = newReg.id;
-
-        // Create pending payment record
-        await supabase.from('payments').insert({
-          registration_id: newReg.id,
-          amount: registrationFee,
-          payment_method: 'UPI_QR',
-          payment_status: 'PENDING',
-        });
-      } else {
-        console.error('Registration insert note:', regErr?.message);
-      }
+      if (regErr) throw regErr;
+      registrationId = newReg.id;
     }
+
+    // Create pending payment record
+    await supabase.from('payments').insert({
+      registration_id: registrationId,
+      amount: registrationFee,
+      payment_method: 'UPI_QR',
+      payment_status: 'PENDING',
+    });
 
     return NextResponse.json({
       success: true,
       registrationId,
       registrationNumber,
+      registrationStatus,
+      waitlistPosition,
       paymentOrder: {
         orderId: `order_${Date.now()}`,
         amount: registrationFee,

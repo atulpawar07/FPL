@@ -1,4 +1,5 @@
-export type UserRole = 'ADMIN' | 'PLAYER';
+export type UserRole = 'ADMIN' | 'MANAGER' | 'PLAYER';
+export type TournamentType = 'OWNER_BASED' | 'NON_OWNER_BASED';
 export type CricketRole = 'BATSMAN' | 'BOWLER' | 'ALL_ROUNDER' | 'BATSMAN_WICKETKEEPER' | 'BOWLER_WICKETKEEPER';
 export type BattingStyle = 'RIGHT_HAND' | 'LEFT_HAND';
 export type JerseySize = 'S' | 'M' | 'L' | 'XL' | 'XXL' | '3XL';
@@ -43,6 +44,34 @@ export interface DbTournament {
   updated_at: string;
   contact_email?: string | null;
   contact_phone?: string | null;
+  tournament_type?: TournamentType;
+  max_teams?: number;
+  owner_registration_fee?: number; // Integer in paise
+  waitlist_enabled?: boolean;
+}
+
+export interface DbTeamOwner {
+  id: string;
+  tournament_id: string;
+  player_id: string;
+  owner_name: string;
+  contact_email: string;
+  contact_phone: string | null;
+  slot_number: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  payment_status: PaymentStatus;
+  payment_screenshot_url: string | null;
+  registered_at: string;
+}
+
+export interface DbManager {
+  id: string;
+  granted_by: string | null;
+  user_email: string;
+  user_id: string | null;
+  display_name: string | null;
+  granted_at: string;
+  is_active: boolean;
 }
 
 export interface DbRegistration {
@@ -78,3 +107,4 @@ export interface DbPayment {
   created_at: string;
   updated_at: string;
 }
+

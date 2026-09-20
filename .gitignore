@@ -29,6 +29,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Google OAuth client secret - DO NOT COMMIT
+client_secret*.json
+
 # vercel
 .vercel
 

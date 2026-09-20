@@ -1,17 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireAdmin } from '@/lib/auth/is-admin';
+
+export async function GET() {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+
+    const { data: tournaments, error } = await supabase
+      .from('tournaments')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return NextResponse.json({ tournaments: tournaments || [] });
+  } catch (err: any) {
+    const status = err.message?.includes('Unauthorized') ? 403 : 500;
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status });
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
-    let userId: string | null = null;
-    try {
-      const supabaseServer = await createServerSupabaseClient();
-      const { data: { user } } = await supabaseServer.auth.getUser();
-      if (user) userId = user.id;
-    } catch {}
-
+    const adminUser = await requireAdmin();
     const body = await req.json();
+
     const {
       id,
       name,
@@ -24,6 +38,10 @@ export async function POST(req: NextRequest) {
       upiId,
       paymentQrUrl,
       registrationOpen,
+      tournamentType,
+      maxTeams,
+      ownerRegistrationFeeRupees,
+      waitlistEnabled,
     } = body;
 
     if (!name || name.trim().length < 2) {
@@ -35,7 +53,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Player capacity must be a positive whole number' }, { status: 400 });
     }
 
+    const tType = tournamentType === 'OWNER_BASED' ? 'OWNER_BASED' : 'NON_OWNER_BASED';
+    const teamsInt = parseInt(maxTeams, 10) || 0;
+    if (tType === 'OWNER_BASED' && teamsInt <= 0) {
+      return NextResponse.json({ error: 'Total Teams count is required for Owner-Based tournaments' }, { status: 400 });
+    }
+
     const registrationFeePaise = Math.round((parseFloat(registrationFeeRupees) || 0) * 100);
+    const ownerRegistrationFeePaise = Math.round((parseFloat(ownerRegistrationFeeRupees) || 0) * 100);
     const supabaseAdmin = createAdminClient();
 
     const tournamentData = {
@@ -49,13 +74,16 @@ export async function POST(req: NextRequest) {
       payment_enabled: paymentEnabled !== undefined ? Boolean(paymentEnabled) : true,
       upi_id: upiId || null,
       payment_qr_url: paymentQrUrl || null,
-      created_by: userId,
+      tournament_type: tType,
+      max_teams: teamsInt,
+      owner_registration_fee: ownerRegistrationFeePaise,
+      waitlist_enabled: waitlistEnabled !== undefined ? Boolean(waitlistEnabled) : true,
+      created_by: adminUser.id,
       updated_at: new Date().toISOString(),
     };
 
     let result;
     if (id) {
-      // Update existing tournament
       const { data: updated, error } = await supabaseAdmin
         .from('tournaments')
         .update(tournamentData)
@@ -65,7 +93,6 @@ export async function POST(req: NextRequest) {
       if (error) throw error;
       result = updated;
     } else {
-      // Create new tournament
       const { data: created, error } = await supabaseAdmin
         .from('tournaments')
         .insert(tournamentData)
@@ -77,6 +104,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, tournament: result });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+    const status = err.message?.includes('Unauthorized') ? 403 : 500;
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status });
   }
 }

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireManager } from '@/lib/auth/is-manager';
 
 export async function GET(req: NextRequest) {
   try {
+    await requireManager();
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
     const role = searchParams.get('role') || 'ALL';

@@ -60,7 +60,44 @@ export default function RegistrationDetailsPage() {
     window.print();
   };
 
-  const handleScreenshotFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImage = (file: File, maxWidth = 1000, quality = 0.7): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          } else {
+            resolve(event.target?.result as string);
+          }
+        };
+        img.onerror = () => resolve(event.target?.result as string);
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = () => {
+        const fallbackReader = new FileReader();
+        fallbackReader.onloadend = () => resolve(fallbackReader.result as string);
+        fallbackReader.readAsDataURL(file);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleScreenshotFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -69,17 +106,18 @@ export default function RegistrationDetailsPage() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File size exceeds 5 MB. Please select a smaller screenshot image.');
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('File size exceeds 10 MB. Please select a smaller screenshot image.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setScreenshotUrl(reader.result as string);
+    try {
+      const compressed = await compressImage(file);
+      setScreenshotUrl(compressed);
       setUploadError(null);
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setUploadError('Failed to process image file. Please try another image.');
+    }
   };
 
   const handleSubmitScreenshot = async (e: React.FormEvent) => {

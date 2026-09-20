@@ -1,0 +1,498 @@
+'use client';
+
+import React, { useEffect, useState, use } from 'react';
+import Link from 'next/link';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { formatPaiseToINR, formatDate } from '@/lib/utils/format';
+import {
+  Users,
+  CheckCircle2,
+  Clock,
+  DollarSign,
+  Copy,
+  ExternalLink,
+  Crown,
+  ChevronLeft,
+  Check,
+  XCircle,
+  FileImage,
+  Filter,
+  Search,
+  Loader2,
+} from 'lucide-react';
+
+export default function SingleTournamentAdminPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: tournamentId } = use(params);
+
+  const [data, setData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'registrations' | 'approval' | 'owners' | 'payments'>('overview');
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Search & Filter
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
+  // Approving state
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  const fetchSummary = () => {
+    setLoading(true);
+    fetch(`/api/admin/tournament/${tournamentId}/summary`)
+      .then((res) => res.json())
+      .then((resData) => {
+        if (!resData.error) {
+          setData(resData);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchSummary();
+  }, [tournamentId]);
+
+  const handleCopyLink = () => {
+    const url = `${window.location.origin}/tournament/${tournamentId}`;
+    navigator.clipboard.writeText(url);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleApprovalAction = async (regId: string, action: 'APPROVE' | 'REJECT') => {
+    setActionLoadingId(regId);
+    try {
+      const res = await fetch(`/api/admin/registrations/${regId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        fetchSummary();
+      }
+    } catch (err) {} finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center text-slate-400 gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+        <span>Loading tournament data...</span>
+      </div>
+    );
+  }
+
+  const tournament = data?.tournament;
+  const registrations: any[] = data?.registrations || [];
+  const teamOwners: any[] = data?.teamOwners || [];
+  const stats = data?.stats;
+
+  const filteredRegistrations = registrations.filter((r) => {
+    const nameMatch = r.registered_name_snapshot?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      r.players?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      r.registration_number?.toLowerCase().includes(searchTerm.toLowerCase());
+    const statusMatch = statusFilter === 'ALL' || r.registration_status === statusFilter;
+    return nameMatch && statusMatch;
+  });
+
+  const pendingApprovals = registrations.filter((r) => r.registration_status === 'WAITING_LIST' || !r.payment || r.payment?.payment_status === 'PENDING');
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Back to Dashboard Nav */}
+      <div className="flex items-center justify-between">
+        <Link href="/admin">
+          <Button variant="outline" size="sm" leftIcon={<ChevronLeft className="w-4 h-4" />}>
+            Back to Dashboard
+          </Button>
+        </Link>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleCopyLink} leftIcon={copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-emerald-400" />}>
+            {copiedLink ? 'Link Copied' : 'Shareable Link'}
+          </Button>
+          <Link href={`/tournament/${tournamentId}`} target="_blank">
+            <Button variant="primary" size="sm" rightIcon={<ExternalLink className="w-3.5 h-3.5" />}>
+              Public View
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* Header Banner */}
+      <Card className="space-y-4 border-2 border-emerald-500/30 bg-slate-900/90">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/40">
+                {tournament?.tournament_type === 'OWNER_BASED' ? '👑 Owner-Based Tournament' : '🏏 Standard Tournament'}
+              </span>
+              <Badge status={tournament?.registration_open ? 'ACTIVE' : 'INACTIVE'}>
+                {tournament?.registration_open ? 'Registration Open' : 'Closed'}
+              </Badge>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">{tournament?.name}</h1>
+            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+              Date: {formatDate(tournament?.tournament_date)} | Player Fee: {formatPaiseToINR(tournament?.registration_fee || 0)} | Capacity: {tournament?.max_players} Players
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <span className="text-[10px] text-slate-500 uppercase font-bold block">Available Slots</span>
+              <span className="text-xl font-extrabold text-teal-400">{stats?.availableSlots || 0}</span>
+            </div>
+            <div className="text-right pl-3 border-l border-slate-800">
+              <span className="text-[10px] text-slate-500 uppercase font-bold block">Total Registered</span>
+              <span className="text-xl font-extrabold text-emerald-400">{stats?.totalRegistered || 0}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors shrink-0 ${activeTab === 'overview' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('registrations')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors shrink-0 ${activeTab === 'registrations' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}`}
+          >
+            Player Registrations ({registrations.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('approval')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors shrink-0 flex items-center gap-1.5 ${activeTab === 'approval' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}`}
+          >
+            <span>Player Approval</span>
+            {pendingApprovals.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-extrabold text-[10px]">
+                {pendingApprovals.length}
+              </span>
+            )}
+          </button>
+
+          {tournament?.tournament_type === 'OWNER_BASED' && (
+            <button
+              onClick={() => setActiveTab('owners')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors shrink-0 flex items-center gap-1.5 ${activeTab === 'owners' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}`}
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <span>Team Owners ({teamOwners.length}/{tournament.max_teams || 8})</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setActiveTab('payments')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors shrink-0 ${activeTab === 'payments' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}`}
+          >
+            Payments Verification ({stats?.pendingPayments || 0} Pending)
+          </button>
+        </div>
+      </Card>
+
+      {/* TAB CONTENT 1: OVERVIEW */}
+      {activeTab === 'overview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2 space-y-4">
+            <h2 className="text-lg font-bold text-white">Tournament Overview</h2>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {tournament?.description || 'No custom description provided for this tournament.'}
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase">Confirmed</span>
+                <span className="text-lg font-bold text-emerald-400">{stats?.confirmedCount || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase">Waitlisted</span>
+                <span className="text-lg font-bold text-sky-400">{stats?.waitlistCount || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase">Paid Count</span>
+                <span className="text-lg font-bold text-teal-400">{stats?.successfulPayments || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase">Pending Review</span>
+                <span className="text-lg font-bold text-amber-400">{stats?.pendingPayments || 0}</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="space-y-4">
+            <h3 className="font-bold text-white text-sm">UPI Payment Configuration</h3>
+            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">UPI ID:</span>
+                <span className="font-mono text-emerald-400 font-semibold">{tournament?.upi_id || 'Not Set'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Fee per player:</span>
+                <span className="font-bold text-slate-200">{formatPaiseToINR(tournament?.registration_fee || 0)}</span>
+              </div>
+              {tournament?.tournament_type === 'OWNER_BASED' && (
+                <div className="flex justify-between border-t border-slate-800 pt-2">
+                  <span className="text-slate-400">Team Owner Fee:</span>
+                  <span className="font-bold text-amber-400">{formatPaiseToINR(tournament?.owner_registration_fee || 0)}</span>
+                </div>
+              )}
+            </div>
+
+            {tournament?.payment_qr_url && (
+              <div className="text-center p-3 bg-white rounded-xl inline-block w-full">
+                <img src={tournament.payment_qr_url} alt="QR Code" className="max-h-40 mx-auto object-contain" />
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* TAB CONTENT 2: REGISTRATIONS TABLE */}
+      {activeTab === 'registrations' && (
+        <Card className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <input
+                type="text"
+                placeholder="Search player name or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-semibold">Filter Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="WAITING_LIST">Waiting List</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+            </div>
+          </div>
+
+          {filteredRegistrations.length === 0 ? (
+            <p className="text-xs text-slate-500 italic p-6 text-center">No player registrations found matching your criteria.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase font-bold text-[10px] border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">Ref #</th>
+                    <th className="p-3">Player</th>
+                    <th className="p-3">Role</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Waitlist Pos</th>
+                    <th className="p-3">Payment</th>
+                    <th className="p-3">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {filteredRegistrations.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-900/60 transition-colors">
+                      <td className="p-3 font-mono text-emerald-400 font-semibold">{r.registration_number}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={r.registered_image_snapshot || r.players?.profile_image_url || '/logo.png'}
+                            alt=""
+                            className="w-7 h-7 rounded-full object-cover bg-slate-800"
+                          />
+                          <div>
+                            <span className="font-bold text-white block">{r.registered_name_snapshot}</span>
+                            <span className="text-[10px] text-slate-400 block">{r.players?.email}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 font-semibold">{r.registered_role_snapshot}</td>
+                      <td className="p-3">
+                        <Badge status={r.registration_status}>{r.registration_status}</Badge>
+                      </td>
+                      <td className="p-3 text-center">{r.waitlist_position ? `#${r.waitlist_position}` : '-'}</td>
+                      <td className="p-3">
+                        <Badge status={r.payment?.payment_status || 'PENDING'}>
+                          {r.payment?.payment_status || 'PENDING'}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-slate-400">{formatDate(r.registered_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* TAB CONTENT 3: APPROVAL QUEUE */}
+      {activeTab === 'approval' && (
+        <Card className="space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-white">Player Approval Queue</h2>
+            <p className="text-xs text-slate-400">
+              Approve player registrations and verify their payments. Approving a player confirms their squad spot.
+            </p>
+          </div>
+
+          {registrations.length === 0 ? (
+            <p className="text-xs text-slate-500 italic p-6 text-center">No registrations to approve.</p>
+          ) : (
+            <div className="space-y-3">
+              {registrations.map((r) => (
+                <div key={r.id} className="p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={r.registered_image_snapshot || '/logo.png'}
+                      alt=""
+                      className="w-12 h-12 rounded-xl object-cover bg-slate-800 border border-slate-700"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-white text-base">{r.registered_name_snapshot}</span>
+                        <Badge status={r.registration_status}>{r.registration_status}</Badge>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Ref: <code className="text-emerald-400 font-bold">{r.registration_number}</code> | Role: {r.registered_role_snapshot} | Batting: {r.registered_batting_style_snapshot || 'Right Hand'}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Email: {r.players?.email} | Payment: <span className="font-bold text-amber-400">{r.payment?.payment_status || 'PENDING'}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      isLoading={actionLoadingId === r.id}
+                      onClick={() => handleApprovalAction(r.id, 'REJECT')}
+                      leftIcon={<XCircle className="w-4 h-4" />}
+                    >
+                      Reject
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      isLoading={actionLoadingId === r.id}
+                      onClick={() => handleApprovalAction(r.id, 'APPROVE')}
+                      leftIcon={<CheckCircle2 className="w-4 h-4" />}
+                    >
+                      Approve & Confirm
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* TAB CONTENT 4: TEAM OWNERS (OWNER_BASED ONLY) */}
+      {activeTab === 'owners' && tournament?.tournament_type === 'OWNER_BASED' && (
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Crown className="w-5 h-5 text-amber-400" />
+                Team Owner Slots ({teamOwners.length} / {tournament.max_teams || 8})
+              </h2>
+              <p className="text-xs text-slate-400">
+                Registered team owners for squad bidding and auction management.
+              </p>
+            </div>
+
+            <Badge status={teamOwners.length >= (tournament.max_teams || 8) ? 'CANCELLED' : 'CONFIRMED'}>
+              {teamOwners.length >= (tournament.max_teams || 8) ? 'All Slots Filled' : `${(tournament.max_teams || 8) - teamOwners.length} Slots Open`}
+            </Badge>
+          </div>
+
+          {teamOwners.length === 0 ? (
+            <p className="text-xs text-slate-500 italic p-6 text-center">No team owners registered yet for this tournament.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teamOwners.map((o) => (
+                <div key={o.id} className="p-4 bg-slate-950 rounded-2xl border border-amber-500/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-400">Team Slot #{o.slot_number}</span>
+                    <Badge status={o.status === 'APPROVED' ? 'CONFIRMED' : 'WAITING_LIST'}>{o.status}</Badge>
+                  </div>
+                  <h3 className="font-extrabold text-white text-base">{o.owner_name}</h3>
+                  <p className="text-xs text-slate-400">Email: {o.contact_email}</p>
+                  {o.contact_phone && <p className="text-xs text-slate-400">Phone: {o.contact_phone}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* TAB CONTENT 5: PAYMENTS VERIFICATION */}
+      {activeTab === 'payments' && (
+        <Card className="space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-white">Payment Proof Verification</h2>
+            <p className="text-xs text-slate-400">
+              Review payment status and screenshots uploaded by players.
+            </p>
+          </div>
+
+          <div className="divide-y divide-slate-800 border border-slate-800 rounded-xl bg-slate-950 overflow-hidden">
+            {registrations.map((r) => (
+              <div key={r.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white">{r.registered_name_snapshot}</span>
+                    <Badge status={r.payment?.payment_status || 'PENDING'}>
+                      {r.payment?.payment_status || 'PENDING'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Ref: <code className="text-emerald-400">{r.registration_number}</code> | Fee: {formatPaiseToINR(tournament?.registration_fee || 0)}
+                  </p>
+                  {r.payment?.verification_note && (
+                    <p className="text-[11px] text-teal-400 mt-1">Note: {r.payment.verification_note}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {r.payment?.payment_screenshot_url ? (
+                    <a href={r.payment.payment_screenshot_url} target="_blank" rel="noreferrer">
+                      <Button variant="outline" size="sm" leftIcon={<FileImage className="w-3.5 h-3.5 text-sky-400" />}>
+                        View Screenshot
+                      </Button>
+                    </a>
+                  ) : (
+                    <span className="text-xs text-slate-500 italic">No Screenshot</span>
+                  )}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleApprovalAction(r.id, 'APPROVE')}
+                    leftIcon={<Check className="w-4 h-4" />}
+                  >
+                    Mark Verified
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
