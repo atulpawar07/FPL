@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import { Header } from '@/components/public/Header';
+import { Modal } from '@/components/ui/Modal';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -21,6 +23,7 @@ import {
   Filter,
   Search,
   Loader2,
+  Eye,
 } from 'lucide-react';
 
 export default function SingleTournamentAdminPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,8 +38,10 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
-  // Approving state
+  // Approving & Modal State
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const fetchSummary = () => {
     setLoading(true);
@@ -64,25 +69,35 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
 
   const handleApprovalAction = async (regId: string, action: 'APPROVE' | 'REJECT') => {
     setActionLoadingId(regId);
+    setActionMessage(null);
     try {
       const res = await fetch(`/api/admin/registrations/${regId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       });
+      const data = await res.json();
       if (res.ok) {
+        setActionMessage(data.message || `Registration ${action.toLowerCase()}d successfully!`);
         fetchSummary();
+      } else {
+        setActionMessage(`Error: ${data.error || 'Failed to update registration'}`);
       }
-    } catch (err) {} finally {
+    } catch (err) {
+      setActionMessage('Network error updating registration');
+    } finally {
       setActionLoadingId(null);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center text-slate-400 gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-        <span>Loading tournament data...</span>
+      <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+        <Header />
+        <div className="flex-1 min-h-[400px] flex items-center justify-center text-slate-400 gap-3">
+          <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+          <span>Loading tournament data...</span>
+        </div>
       </div>
     );
   }
@@ -96,14 +111,23 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
     const nameMatch = r.registered_name_snapshot?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       r.players?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       r.registration_number?.toLowerCase().includes(searchTerm.toLowerCase());
-    const statusMatch = statusFilter === 'ALL' || r.registration_status === statusFilter;
+    const statusMatch = statusFilter === 'ALL' || r.registration_status === statusFilter || r.status === statusFilter;
     return nameMatch && statusMatch;
   });
 
-  const pendingApprovals = registrations.filter((r) => r.registration_status === 'WAITING_LIST' || !r.payment || r.payment?.payment_status === 'PENDING');
+  const pendingApprovals = registrations.filter((r) => r.registration_status === 'WAITING_LIST' || r.status === 'PENDING' || !r.payment || r.payment?.payment_status === 'PENDING');
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-white">
+      <Header />
+
+      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
+        {actionMessage && (
+          <div className="p-4 bg-emerald-950/90 border border-emerald-500/50 rounded-2xl text-emerald-300 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-xl">
+            <span>{actionMessage}</span>
+            <button onClick={() => setActionMessage(null)} className="text-slate-400 hover:text-white">✕</button>
+          </div>
+        )}
       {/* Back to Dashboard Nav */}
       <div className="flex items-center justify-between">
         <Link href="/admin">
@@ -522,17 +546,21 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
 
                 <div className="flex items-center gap-2">
                   {r.payment?.payment_screenshot_url ? (
-                    <a href={r.payment.payment_screenshot_url} target="_blank" rel="noreferrer">
-                      <Button variant="outline" size="sm" leftIcon={<FileImage className="w-3.5 h-3.5 text-sky-400" />}>
-                        View Screenshot
-                      </Button>
-                    </a>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPreviewImageUrl(r.payment.payment_screenshot_url)}
+                      leftIcon={<Eye className="w-3.5 h-3.5 text-sky-400" />}
+                    >
+                      View Receipt Screenshot
+                    </Button>
                   ) : (
                     <span className="text-xs text-slate-500 italic">No Screenshot</span>
                   )}
                   <Button
                     variant="primary"
                     size="sm"
+                    isLoading={actionLoadingId === r.id}
                     onClick={() => handleApprovalAction(r.id, 'APPROVE')}
                     leftIcon={<Check className="w-4 h-4" />}
                   >
@@ -543,6 +571,36 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
             ))}
           </div>
         </Card>
+      )}
+      </main>
+
+      {previewImageUrl && (
+        <Modal
+          isOpen={Boolean(previewImageUrl)}
+          onClose={() => setPreviewImageUrl(null)}
+          title="📷 Payment Proof Receipt Screenshot"
+          maxWidth="lg"
+        >
+          <div className="p-2 space-y-4 text-center">
+            <div className="max-h-[70vh] overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-2 flex items-center justify-center">
+              <img
+                src={previewImageUrl}
+                alt="Payment Screenshot Preview"
+                className="max-w-full h-auto object-contain rounded-lg shadow-2xl"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <a href={previewImageUrl} target="_blank" rel="noreferrer">
+                <Button variant="outline" size="sm" leftIcon={<ExternalLink className="w-4 h-4" />}>
+                  Open Full Resolution
+                </Button>
+              </a>
+              <Button variant="secondary" size="sm" onClick={() => setPreviewImageUrl(null)}>
+                Close Preview
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

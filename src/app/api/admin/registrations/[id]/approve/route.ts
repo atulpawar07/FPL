@@ -28,10 +28,18 @@ export async function POST(
     const newStatus = action === 'REJECT' ? 'CANCELLED' : 'CONFIRMED';
     const newPaymentStatus = action === 'REJECT' ? 'FAILED' : 'SUCCESSFUL';
 
-    // Update registration status
+    // Fetch full registration detail to check team_owner_id
+    const { data: fullReg } = await supabase
+      .from('registrations')
+      .select('id, team_owner_id, registration_type')
+      .eq('id', registrationId)
+      .maybeSingle();
+
+    // Update registration status (both status and registration_status for full compatibility)
     const { error: updateRegErr } = await supabase
       .from('registrations')
       .update({
+        status: newStatus,
         registration_status: newStatus,
         updated_at: new Date().toISOString(),
       })
@@ -39,6 +47,19 @@ export async function POST(
 
     if (updateRegErr) {
       return NextResponse.json({ error: updateRegErr.message || 'Failed to update registration status' }, { status: 500 });
+    }
+
+    // Mapped update to associated team_owners table if linked
+    if (fullReg?.team_owner_id) {
+      const ownerStatus = newStatus === 'CONFIRMED' ? 'APPROVED' : 'REJECTED';
+      await supabase
+        .from('team_owners')
+        .update({
+          status: ownerStatus,
+          payment_status: newPaymentStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', fullReg.team_owner_id);
     }
 
     // Upsert payment record

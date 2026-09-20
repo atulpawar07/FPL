@@ -59,8 +59,8 @@ export default function AdminDashboardPage() {
   const [tIconPlayerEnabled, setTIconPlayerEnabled] = useState(false);
   const [tOwnerIsPlayingEnabled, setTOwnerIsPlayingEnabled] = useState(true);
   const [tWaitlistEnabled, setTWaitlistEnabled] = useState(true);
-  const [tUpiId, setTUpiId] = useState('');
-  const [tPaymentQrUrl, setTPaymentQrUrl] = useState('');
+  const [tUpiId, setTUpiId] = useState('titusalex786@okaxis');
+  const [tPaymentQrUrl, setTPaymentQrUrl] = useState('/images/qr/titusalex786.png');
   const [tBannerUrl, setTBannerUrl] = useState('');
   const [tRegistrationEndDate, setTRegistrationEndDate] = useState('');
   const [tRegistrationOpen, setTRegistrationOpen] = useState(true);
@@ -107,8 +107,8 @@ export default function AdminDashboardPage() {
     setTIconPlayerEnabled(false);
     setTOwnerIsPlayingEnabled(true);
     setTWaitlistEnabled(true);
-    setTUpiId('');
-    setTPaymentQrUrl('');
+    setTUpiId('titusalex786@okaxis');
+    setTPaymentQrUrl('/images/qr/titusalex786.png');
     setTBannerUrl('');
     setTRegistrationEndDate('');
     setTRegistrationOpen(true);
@@ -646,12 +646,48 @@ export default function AdminDashboardPage() {
             />
           </div>
 
-          <Input
-            label="Admin UPI ID (Optional)"
-            value={tUpiId}
-            onChange={(e) => setTUpiId(e.target.value)}
-            placeholder="organizer@upi"
-          />
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-slate-300 block">
+              Default UPI Payment Options & QR Code
+            </label>
+            <div className="flex flex-wrap gap-2 pb-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setTUpiId('titusalex786@okaxis');
+                  setTPaymentQrUrl('/images/qr/titusalex786.png');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                  tUpiId === 'titusalex786@okaxis'
+                    ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow-md'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                💳 DBS UPI (titusalex786@okaxis)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTUpiId('titusalex786-2@okaxis');
+                  setTPaymentQrUrl('/images/qr/titusalex786-2.png');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                  tUpiId === 'titusalex786-2@okaxis'
+                    ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow-md'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                💳 Axis UPI (titusalex786-2@okaxis)
+              </button>
+            </div>
+
+            <Input
+              label="Admin UPI ID"
+              value={tUpiId}
+              onChange={(e) => setTUpiId(e.target.value)}
+              placeholder="titusalex786@okaxis"
+            />
+          </div>
 
           {/* Tournament Banner Image Upload */}
           <div className="space-y-2">
@@ -680,15 +716,15 @@ export default function AdminDashboardPage() {
             <label className="text-xs font-medium text-slate-300 block">Personal UPI QR Code Image</label>
             <div className="flex items-center gap-4 p-3 bg-slate-950 rounded-xl border border-slate-800">
               {tPaymentQrUrl ? (
-                <img src={tPaymentQrUrl} alt="UPI QR Preview" className="w-14 h-14 object-contain bg-white rounded" />
+                <img src={tPaymentQrUrl} alt="UPI QR Preview" className="w-16 h-16 object-contain bg-white p-1 rounded-lg border border-emerald-500" />
               ) : (
-                <div className="w-14 h-14 bg-slate-800 rounded flex items-center justify-center text-slate-500 text-[10px]">
+                <div className="w-16 h-16 bg-slate-800 rounded-lg flex items-center justify-center text-slate-500 text-[10px]">
                   No QR
                 </div>
               )}
               <div>
                 <label className="cursor-pointer px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition-colors inline-block">
-                  Choose QR Image
+                  Choose Custom QR Image
                   <input type="file" accept="image/*" className="hidden" onChange={handleQrUpload} />
                 </label>
               </div>

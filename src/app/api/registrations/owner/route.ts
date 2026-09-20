@@ -198,6 +198,7 @@ export async function POST(req: NextRequest) {
           player_id: effectiveOwnerPlayerId,
           registration_reference: ownerRegRef,
           status: 'PENDING',
+          registration_status: 'PENDING',
           registration_type: 'OWNER',
           team_name: finalTeamName,
           team_owner_id: newOwner.id,
@@ -212,6 +213,21 @@ export async function POST(req: NextRequest) {
         console.warn('Could not insert OWNER registration record (falling back):', ownerRegErr.message);
       } else {
         ownerRegistrationId = ownerRegData?.id || null;
+        if (ownerRegistrationId && paymentScreenshotUrl) {
+          try {
+            await supabase.from('payments').insert({
+              registration_id: ownerRegistrationId,
+              amount: tournament.owner_registration_fee || 250000,
+              payment_method: 'UPI_QR',
+              payment_status: 'PENDING',
+              payment_screenshot_url: paymentScreenshotUrl,
+              transaction_reference: 'OWNER-PAY-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+              created_at: new Date().toISOString(),
+            });
+          } catch (pErr) {
+            console.error('Owner payment insert error:', pErr);
+          }
+        }
       }
     }
 
