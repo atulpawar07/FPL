@@ -27,10 +27,10 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Verify tournament is OWNER_BASED
+    // Verify tournament is OWNER_BASED (using select('*') so missing columns on remote DB don't cause error)
     const { data: tournament, error: tErr } = await supabase
       .from('tournaments')
-      .select('id, name, max_teams, max_players, owner_registration_fee, tournament_type, icon_player_enabled, owner_is_playing_enabled')
+      .select('*')
       .eq('id', tournamentId)
       .maybeSingle();
 
@@ -47,7 +47,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This tournament does not accept team owner registrations' }, { status: 400 });
     }
 
-    if (tournament.icon_player_enabled && !iconPlayerName?.trim() && !ownerIsPlaying) {
+    const isIconEnabled = tournament.icon_player_enabled !== false;
+    const isPlayingAllowed = tournament.owner_is_playing_enabled !== false;
+
+    if (isIconEnabled && !iconPlayerName?.trim() && !ownerIsPlaying) {
       return NextResponse.json({ error: 'Icon Player Name is required for this tournament' }, { status: 400 });
     }
 
@@ -94,34 +97,56 @@ export async function POST(req: NextRequest) {
     const nextSlot = (currentOwnersCount || 0) + 1;
     const finalTeamName = teamName?.trim() || `Team ${ownerName.trim()}`;
 
-    // 1. Insert Team Owner Record
-    const { data: newOwner, error: insertErr } = await supabase
+    // 1. Insert Team Owner Record (with fallback if new schema columns are missing on remote DB)
+    const ownerPayload: any = {
+      tournament_id: tournamentId,
+      player_id: effectiveOwnerPlayerId,
+      team_name: finalTeamName,
+      team_logo_url: teamLogoUrl || null,
+      owner_name: ownerName.trim(),
+      contact_email: contactEmail.trim().toLowerCase(),
+      contact_phone: contactPhone || null,
+      slot_number: nextSlot,
+      status: 'PENDING',
+      payment_status: 'PENDING',
+      payment_screenshot_url: paymentScreenshotUrl || null,
+      owner_is_playing: ownerIsPlaying !== false && isPlayingAllowed,
+      owner_cricket_role: ownerCricketRole || 'BATSMAN',
+      icon_player_name: iconPlayerName?.trim() || ownerName.trim(),
+      icon_player_mobile: iconPlayerMobile || contactPhone || null,
+      icon_player_role: iconPlayerRole || ownerCricketRole || 'BATSMAN',
+      icon_player_batting_style: iconPlayerBattingStyle || 'RIGHT_HAND',
+    };
+
+    let { data: newOwner, error: insertErr } = await supabase
       .from('team_owners')
-      .insert({
-        tournament_id: tournamentId,
-        player_id: effectiveOwnerPlayerId,
-        team_name: finalTeamName,
-        team_logo_url: teamLogoUrl || null,
-        owner_name: ownerName.trim(),
-        contact_email: contactEmail.trim().toLowerCase(),
-        contact_phone: contactPhone || null,
-        slot_number: nextSlot,
-        status: 'PENDING',
-        payment_status: 'PENDING',
-        payment_screenshot_url: paymentScreenshotUrl || null,
-        owner_is_playing: ownerIsPlaying !== false,
-        owner_cricket_role: ownerCricketRole || 'BATSMAN',
-        icon_player_name: iconPlayerName?.trim() || ownerName.trim(),
-        icon_player_mobile: iconPlayerMobile || contactPhone || null,
-        icon_player_role: iconPlayerRole || ownerCricketRole || 'BATSMAN',
-        icon_player_batting_style: iconPlayerBattingStyle || 'RIGHT_HAND',
-      })
+      .insert(ownerPayload)
       .select()
       .single();
 
-    if (insertErr) {
+    if (insertErr && insertErr.message?.includes('column')) {
+      // Fallback: strip newly added schema columns if remote DB hasn't run latest SQL migration
+      delete ownerPayload.team_name;
+      delete ownerPayload.team_logo_url;
+      delete ownerPayload.owner_is_playing;
+      delete ownerPayload.owner_cricket_role;
+      delete ownerPayload.icon_player_name;
+      delete ownerPayload.icon_player_mobile;
+      delete ownerPayload.icon_player_role;
+      delete ownerPayload.icon_player_batting_style;
+
+      const fallbackRes = await supabase
+        .from('team_owners')
+        .insert(ownerPayload)
+        .select()
+        .single();
+      newOwner = fallbackRes.data;
+      insertErr = fallbackRes.error;
+    }
+
+    if (insertErr || !newOwner) {
       console.error('Team Owner insert error:', insertErr);
-      return NextResponse.json({ error: insertErr.message || 'Failed to insert team owner record' }, { status: 500 });
+      return NextResponse.json({ error: insertErr?.message || 'Failed to insert team owner record' }, { status: 500 });
     }
 
     let ownerRegistrationId: string | null = null;
