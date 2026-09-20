@@ -103,6 +103,12 @@ export const Header: React.FC = () => {
             Home
           </Link>
           <Link
+            href="/#about-fpl"
+            className="text-sm font-medium text-slate-300 hover:text-emerald-400 transition-colors"
+          >
+            About FPL
+          </Link>
+          <Link
             href="/#tournament-info"
             className="text-sm font-medium text-slate-300 hover:text-emerald-400 transition-colors"
           >
