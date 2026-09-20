@@ -106,13 +106,23 @@ function HomePageContent() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
               {/* TOURNAMENT BANNER DISPLAY (Mobile top / Desktop side) */}
               <div className="lg:col-span-6 space-y-4">
-                <div className="w-full rounded-3xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl relative group">
+                <div className="w-full rounded-3xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl relative group">
                   {activeTournament?.banner_url ? (
-                    <img
-                      src={activeTournament.banner_url}
-                      alt={activeTournament.name}
-                      className="w-full h-56 sm:h-72 md:h-80 object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
+                    <div className="relative w-full flex items-center justify-center bg-slate-950 overflow-hidden min-h-[220px] sm:min-h-[300px]">
+                      {/* Ambient background glow */}
+                      <img
+                        src={activeTournament.banner_url}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-25 scale-110 pointer-events-none"
+                      />
+                      {/* Uncropped main banner image */}
+                      <img
+                        src={activeTournament.banner_url}
+                        alt={activeTournament.name}
+                        className="w-full h-auto max-h-[420px] object-contain relative z-10 group-hover:scale-[1.01] transition-transform duration-500"
+                      />
+                    </div>
                   ) : (
                     <div className="w-full h-56 sm:h-72 md:h-80 bg-gradient-to-tr from-slate-900 via-emerald-950 to-teal-900 p-8 flex flex-col justify-between relative overflow-hidden">
                       <div className="absolute -right-10 -bottom-10 opacity-10">
@@ -133,8 +143,8 @@ function HomePageContent() {
                   )}
 
                   {/* Banner Overlay Badge */}
-                  <div className="absolute top-4 left-4 flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-full bg-slate-950/90 backdrop-blur-md border border-slate-800 text-white text-xs font-bold flex items-center gap-1.5">
+                  <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-full bg-slate-950/90 backdrop-blur-md border border-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg">
                       <Calendar className="w-3.5 h-3.5 text-emerald-400" />
                       {activeTournament ? formatDate(activeTournament.tournament_date) : 'Coming Soon'}
                     </span>

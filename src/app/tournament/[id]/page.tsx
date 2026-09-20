@@ -202,8 +202,18 @@ export default function PublicTournamentPage() {
               {/* Tournament Header Banner Card */}
               <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-6 relative overflow-hidden">
                 {tournament.banner_url && (
-                  <div className="w-full h-44 sm:h-64 rounded-2xl overflow-hidden border border-slate-800">
-                    <img src={tournament.banner_url} alt={tournament.name} className="w-full h-full object-cover" />
+                  <div className="relative w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center min-h-[200px] overflow-hidden">
+                    <img
+                      src={tournament.banner_url}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-25 scale-110 pointer-events-none"
+                    />
+                    <img
+                      src={tournament.banner_url}
+                      alt={tournament.name}
+                      className="w-full h-auto max-h-[420px] object-contain relative z-10"
+                    />
                   </div>
                 )}
 
