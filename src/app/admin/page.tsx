@@ -56,6 +56,7 @@ export default function AdminDashboardPage() {
   const [tType, setTType] = useState<TournamentType>('NON_OWNER_BASED');
   const [tMaxTeams, setTMaxTeams] = useState(8);
   const [tOwnerFeeRupees, setTOwnerFeeRupees] = useState(2500);
+  const [tIconPlayerEnabled, setTIconPlayerEnabled] = useState(false);
   const [tWaitlistEnabled, setTWaitlistEnabled] = useState(true);
   const [tUpiId, setTUpiId] = useState('');
   const [tPaymentQrUrl, setTPaymentQrUrl] = useState('');
@@ -102,6 +103,7 @@ export default function AdminDashboardPage() {
     setTType('NON_OWNER_BASED');
     setTMaxTeams(8);
     setTOwnerFeeRupees(2500);
+    setTIconPlayerEnabled(false);
     setTWaitlistEnabled(true);
     setTUpiId('');
     setTPaymentQrUrl('');
@@ -121,6 +123,7 @@ export default function AdminDashboardPage() {
     setTType(t.tournament_type || 'NON_OWNER_BASED');
     setTMaxTeams(t.max_teams || 8);
     setTOwnerFeeRupees((t.owner_registration_fee || 250000) / 100);
+    setTIconPlayerEnabled(Boolean(t.icon_player_enabled));
     setTWaitlistEnabled(t.waitlist_enabled !== false);
     setTUpiId(t.upi_id || '');
     setTPaymentQrUrl(t.payment_qr_url || '');
@@ -172,6 +175,7 @@ export default function AdminDashboardPage() {
           tournamentType: tType,
           maxTeams: tMaxTeams,
           ownerRegistrationFeeRupees: tOwnerFeeRupees,
+          iconPlayerEnabled: tIconPlayerEnabled,
           waitlistEnabled: tWaitlistEnabled,
           upiId: tUpiId,
           paymentQrUrl: tPaymentQrUrl,
@@ -539,25 +543,44 @@ export default function AdminDashboardPage() {
           </div>
 
           {tType === 'OWNER_BASED' && (
-            <div className="p-3 bg-amber-950/40 border border-amber-500/30 rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Total Team Owner Slots"
-                type="number"
-                required
-                min={1}
-                value={tMaxTeams}
-                onChange={(e) => setTMaxTeams(parseInt(e.target.value, 10) || 8)}
-                helperText="e.g. 8 teams = 8 owner slots maximum"
-              />
+            <div className="p-3.5 bg-amber-950/40 border border-amber-500/30 rounded-xl space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Total Team Owner Slots *"
+                  type="number"
+                  required
+                  min={1}
+                  value={tMaxTeams}
+                  onChange={(e) => setTMaxTeams(parseInt(e.target.value, 10) || 8)}
+                  helperText="e.g. 8 teams = 8 owner slots maximum"
+                />
 
-              <Input
-                label="Team Owner Fee (₹ INR)"
-                type="number"
-                required
-                value={tOwnerFeeRupees}
-                onChange={(e) => setTOwnerFeeRupees(parseFloat(e.target.value) || 0)}
-                helperText="Registration fee per team owner"
-              />
+                <Input
+                  label="Team Owner Fee (₹ INR) *"
+                  type="number"
+                  required
+                  value={tOwnerFeeRupees}
+                  onChange={(e) => setTOwnerFeeRupees(parseFloat(e.target.value) || 0)}
+                  helperText="Registration fee per team owner"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer pt-1 border-t border-amber-500/20">
+                <input
+                  type="checkbox"
+                  checked={tIconPlayerEnabled}
+                  onChange={(e) => setTIconPlayerEnabled(e.target.checked)}
+                  className="w-4 h-4 accent-amber-500 rounded"
+                />
+                <div>
+                  <span className="text-xs font-bold text-amber-300 block">
+                    👑 Require Icon Player Registration for Team Owners
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">
+                    When checked, team owners will be required to register their squad's Icon Player.
+                  </span>
+                </div>
+              </label>
             </div>
           )}
 

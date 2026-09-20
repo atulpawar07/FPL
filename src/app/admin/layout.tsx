@@ -15,6 +15,8 @@ import {
   X,
   Loader2,
   ShieldCheck,
+  Home,
+  ArrowLeft,
 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -78,18 +80,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row selection:bg-emerald-500 selection:text-white">
       {/* Mobile Header Bar */}
       <div className="md:hidden sticky top-0 z-40 bg-slate-900 border-b border-slate-800 p-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold">
             <Trophy className="w-4 h-4" />
           </div>
-          <span className="font-bold text-sm text-white">Admin Portal</span>
+          <span className="font-bold text-sm text-white">Admin Console</span>
+        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/" className="p-2 rounded-lg text-slate-300 hover:bg-slate-800 focus:outline-none flex items-center gap-1 text-xs font-semibold">
+            <ArrowLeft className="w-4 h-4 text-emerald-400" />
+            <span>Home</span>
+          </Link>
+          <button
+            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+            className="p-2 rounded-lg text-slate-300 hover:bg-slate-800 focus:outline-none"
+          >
+            {mobileSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
-        <button
-          onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-          className="p-2 rounded-lg text-slate-300 hover:bg-slate-800 focus:outline-none"
-        >
-          {mobileSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
       </div>
 
       {/* Mobile Drawer Overlay */}
@@ -108,21 +116,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       >
         <div className="space-y-6">
-          {/* Logo */}
-          <div className="flex items-center gap-3 pb-4 border-b border-slate-800">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md">
+          {/* Logo & Back to website link */}
+          <Link href="/" className="flex items-center gap-3 pb-4 border-b border-slate-800 group">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
               <Trophy className="w-6 h-6" />
             </div>
             <div>
-              <span className="font-extrabold text-base text-white block">Premier Cricket</span>
+              <span className="font-extrabold text-base text-white block group-hover:text-emerald-400 transition-colors">Premier Cricket</span>
               <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block">
                 Admin Console
               </span>
             </div>
-          </div>
+          </Link>
 
           {/* Navigation */}
           <nav className="space-y-1">
+            <Link
+              href="/"
+              onClick={() => setMobileSidebarOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-xs sm:text-sm bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 mb-3 transition-colors"
+            >
+              <Home className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span>← Back to Website Home</span>
+            </Link>
+
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;

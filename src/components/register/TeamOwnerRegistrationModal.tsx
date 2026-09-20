@@ -26,6 +26,13 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
   const [contactEmail, setContactEmail] = useState(currentUser?.email || '');
   const [contactPhone, setContactPhone] = useState('');
   const [screenshotUrl, setScreenshotUrl] = useState('');
+
+  // Icon Player state
+  const [iconPlayerName, setIconPlayerName] = useState('');
+  const [iconPlayerMobile, setIconPlayerMobile] = useState('');
+  const [iconPlayerRole, setIconPlayerRole] = useState('BATSMAN');
+  const [iconPlayerBattingStyle, setIconPlayerBattingStyle] = useState('RIGHT_HAND');
+
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -48,6 +55,11 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
       return;
     }
 
+    if (tournament?.icon_player_enabled && !iconPlayerName.trim()) {
+      setErrorMsg('Icon Player Name is required for this tournament');
+      return;
+    }
+
     setSubmitting(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -63,6 +75,10 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
           contactPhone,
           playerId: currentUser?.id,
           paymentScreenshotUrl: screenshotUrl,
+          iconPlayerName,
+          iconPlayerMobile,
+          iconPlayerRole,
+          iconPlayerBattingStyle,
         }),
       });
 
@@ -87,6 +103,8 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
   const ownerFeeDisplay = tournament?.owner_registration_fee
     ? formatPaiseToINR(tournament.owner_registration_fee)
     : '₹0';
+
+  const isIconRequired = Boolean(tournament?.icon_player_enabled);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="👑 Team Owner Registration" maxWidth="md">
@@ -139,6 +157,53 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
           onChange={(e) => setContactPhone(e.target.value)}
           placeholder="9876543210"
         />
+
+        {/* ICON PLAYER SECTION */}
+        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-extrabold text-amber-300 flex items-center gap-1.5">
+              <Crown className="w-4 h-4 text-amber-400" />
+              Icon Player Details {isIconRequired ? '*' : '(Optional)'}
+            </span>
+            {isIconRequired && (
+              <span className="text-[10px] font-bold text-amber-400 bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                Required
+              </span>
+            )}
+          </div>
+
+          <Input
+            label="Icon Player Full Name"
+            required={isIconRequired}
+            value={iconPlayerName}
+            onChange={(e) => setIconPlayerName(e.target.value)}
+            placeholder="e.g. Rohit Sharma"
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Icon Player Mobile"
+              type="tel"
+              value={iconPlayerMobile}
+              onChange={(e) => setIconPlayerMobile(e.target.value)}
+              placeholder="9876543210"
+            />
+
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1">Playing Role</label>
+              <select
+                value={iconPlayerRole}
+                onChange={(e) => setIconPlayerRole(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl p-2.5 text-xs focus:ring-1 focus:ring-emerald-500"
+              >
+                <option value="BATSMAN">Batsman</option>
+                <option value="BOWLER">Bowler</option>
+                <option value="ALL_ROUNDER">All-Rounder</option>
+                <option value="BATSMAN_WICKETKEEPER">Wicketkeeper-Batsman</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
         {/* Payment Proof for Owner Registration */}
         {tournament?.owner_registration_fee > 0 && (

@@ -11,6 +11,10 @@ export async function POST(req: NextRequest) {
       contactPhone,
       playerId,
       paymentScreenshotUrl,
+      iconPlayerName,
+      iconPlayerMobile,
+      iconPlayerRole,
+      iconPlayerBattingStyle,
     } = body;
 
     if (!tournamentId || !ownerName || !contactEmail) {
@@ -22,7 +26,7 @@ export async function POST(req: NextRequest) {
     // Verify tournament is OWNER_BASED
     const { data: tournament, error: tErr } = await supabase
       .from('tournaments')
-      .select('id, name, max_teams, owner_registration_fee, tournament_type')
+      .select('id, name, max_teams, owner_registration_fee, tournament_type, icon_player_enabled')
       .eq('id', tournamentId)
       .single();
 
@@ -34,14 +38,52 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This tournament does not accept team owner registrations' }, { status: 400 });
     }
 
+    if (tournament.icon_player_enabled && !iconPlayerName?.trim()) {
+      return NextResponse.json({ error: 'Icon Player Name is required for this tournament' }, { status: 400 });
+    }
+
+    // Auto-resolve or create Player record if playerId not supplied
+    let effectivePlayerId: string | null = playerId || null;
+    if (!effectivePlayerId) {
+      const { data: existingPlayer } = await supabase
+        .from('players')
+        .select('id')
+        .eq('email', contactEmail.toLowerCase().trim())
+        .maybeSingle();
+
+      if (existingPlayer?.id) {
+        effectivePlayerId = existingPlayer.id;
+      } else {
+        // Upsert a lightweight player profile for the owner
+        const ref = 'OWNER-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        const { data: createdPlayer } = await supabase
+          .from('players')
+          .insert({
+            registration_reference: ref,
+            full_name: ownerName.trim(),
+            email: contactEmail.toLowerCase().trim(),
+            mobile: contactPhone || '0000000000',
+          })
+          .select('id')
+          .single();
+        if (createdPlayer?.id) {
+          effectivePlayerId = createdPlayer.id;
+        }
+      }
+    }
+
     // Attempt atomic slot allocation
     const { data: rpcData, error: rpcErr } = await supabase.rpc('allocate_owner_slot', {
       p_tournament_id: tournamentId,
-      p_player_id: playerId,
+      p_player_id: effectivePlayerId,
       p_owner_name: ownerName,
       p_contact_email: contactEmail,
       p_contact_phone: contactPhone || null,
       p_payment_screenshot_url: paymentScreenshotUrl || null,
+      p_icon_player_name: iconPlayerName || null,
+      p_icon_player_mobile: iconPlayerMobile || null,
+      p_icon_player_role: iconPlayerRole || null,
+      p_icon_player_batting_style: iconPlayerBattingStyle || null,
     });
 
     if (!rpcErr && rpcData && rpcData.length > 0) {
@@ -71,7 +113,7 @@ export async function POST(req: NextRequest) {
       .from('team_owners')
       .insert({
         tournament_id: tournamentId,
-        player_id: playerId,
+        player_id: effectivePlayerId,
         owner_name: ownerName,
         contact_email: contactEmail,
         contact_phone: contactPhone || null,
@@ -79,6 +121,10 @@ export async function POST(req: NextRequest) {
         status: 'PENDING',
         payment_status: 'PENDING',
         payment_screenshot_url: paymentScreenshotUrl || null,
+        icon_player_name: iconPlayerName || null,
+        icon_player_mobile: iconPlayerMobile || null,
+        icon_player_role: iconPlayerRole || null,
+        icon_player_batting_style: iconPlayerBattingStyle || null,
       })
       .select()
       .single();

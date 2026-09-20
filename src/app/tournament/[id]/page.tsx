@@ -47,9 +47,10 @@ export default function PublicTournamentPage() {
 
   useEffect(() => {
     if (!id) return;
+    setLoading(true);
 
     // 1. Fetch Tournament details & Confirmed Players Roster
-    fetch(`/api/tournaments/${id}`)
+    const tPromise = fetch(`/api/tournaments/${id}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.error) {
@@ -62,7 +63,8 @@ export default function PublicTournamentPage() {
           setConfirmedPlayers(data.confirmedPlayers || []);
         }
       })
-      .catch(() => setErrorMsg('Failed to load tournament details'));
+      .catch(() => setErrorMsg('Failed to load tournament details'))
+      .finally(() => setLoading(false));
 
     // 2. Fetch authenticated user & prefill persistent profile
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -90,7 +92,7 @@ export default function PublicTournamentPage() {
           })
           .catch(() => {});
       }
-    }).finally(() => setLoading(false));
+    });
   }, [id, supabase]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

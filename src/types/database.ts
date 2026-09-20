@@ -50,12 +50,13 @@ export interface DbTournament {
   waitlist_enabled?: boolean;
   banner_url?: string | null;
   registration_end_date?: string | null;
+  icon_player_enabled?: boolean;
 }
 
 export interface DbTeamOwner {
   id: string;
   tournament_id: string;
-  player_id: string;
+  player_id?: string | null;
   owner_name: string;
   contact_email: string;
   contact_phone: string | null;
@@ -63,6 +64,11 @@ export interface DbTeamOwner {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   payment_status: PaymentStatus;
   payment_screenshot_url: string | null;
+  icon_player_name?: string | null;
+  icon_player_mobile?: string | null;
+  icon_player_role?: string | null;
+  icon_player_batting_style?: string | null;
+  icon_player_bowling_style?: string | null;
   registered_at: string;
 }
 

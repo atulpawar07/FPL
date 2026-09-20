@@ -14,10 +14,8 @@ ALTER TABLE tournaments
   ADD COLUMN IF NOT EXISTS owner_registration_fee INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS waitlist_enabled BOOLEAN DEFAULT true,
   ADD COLUMN IF NOT EXISTS banner_url TEXT,
-  ADD COLUMN IF NOT EXISTS registration_end_date TIMESTAMPTZ;
-
--- Refresh Supabase PostgREST schema cache
-NOTIFY pgrst, 'reload schema';
+  ADD COLUMN IF NOT EXISTS registration_end_date TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS icon_player_enabled BOOLEAN DEFAULT false;
 
 -- 2. Create Managers Table
 CREATE TABLE IF NOT EXISTS managers (
@@ -38,7 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_managers_user_id ON managers(user_id) WHERE is_ac
 CREATE TABLE IF NOT EXISTS team_owners (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-  player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  player_id UUID REFERENCES players(id) ON DELETE SET NULL,
   owner_name TEXT NOT NULL,
   contact_email TEXT NOT NULL,
   contact_phone TEXT,
@@ -46,10 +44,24 @@ CREATE TABLE IF NOT EXISTS team_owners (
   status TEXT NOT NULL DEFAULT 'PENDING',
   payment_status TEXT NOT NULL DEFAULT 'PENDING',
   payment_screenshot_url TEXT,
+  icon_player_name TEXT,
+  icon_player_mobile TEXT,
+  icon_player_role TEXT,
+  icon_player_batting_style TEXT,
+  icon_player_bowling_style TEXT,
   registered_at TIMESTAMPTZ DEFAULT now(),
-  CONSTRAINT unique_tournament_owner_slot UNIQUE (tournament_id, slot_number),
-  CONSTRAINT unique_tournament_owner_player UNIQUE (tournament_id, player_id)
+  CONSTRAINT unique_tournament_owner_slot UNIQUE (tournament_id, slot_number)
 );
+
+ALTER TABLE team_owners ALTER COLUMN player_id DROP NOT NULL;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_name TEXT;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_mobile TEXT;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_role TEXT;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_batting_style TEXT;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_bowling_style TEXT;
+
+-- Refresh Supabase PostgREST schema cache
+NOTIFY pgrst, 'reload schema';
 
 CREATE INDEX IF NOT EXISTS idx_team_owners_tournament_id ON team_owners(tournament_id);
 
@@ -217,7 +229,11 @@ CREATE OR REPLACE FUNCTION allocate_owner_slot(
   p_owner_name TEXT,
   p_contact_email TEXT,
   p_contact_phone TEXT DEFAULT NULL,
-  p_payment_screenshot_url TEXT DEFAULT NULL
+  p_payment_screenshot_url TEXT DEFAULT NULL,
+  p_icon_player_name TEXT DEFAULT NULL,
+  p_icon_player_mobile TEXT DEFAULT NULL,
+  p_icon_player_role TEXT DEFAULT NULL,
+  p_icon_player_batting_style TEXT DEFAULT NULL
 )
 RETURNS TABLE (
   owner_id UUID,
@@ -264,6 +280,10 @@ BEGIN
     status,
     payment_status,
     payment_screenshot_url,
+    icon_player_name,
+    icon_player_mobile,
+    icon_player_role,
+    icon_player_batting_style,
     registered_at
   ) VALUES (
     p_tournament_id,
@@ -275,6 +295,10 @@ BEGIN
     'PENDING',
     'PENDING',
     p_payment_screenshot_url,
+    p_icon_player_name,
+    p_icon_player_mobile,
+    p_icon_player_role,
+    p_icon_player_batting_style,
     NOW()
   )
   RETURNING id INTO v_owner_id;

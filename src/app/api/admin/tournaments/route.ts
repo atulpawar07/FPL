@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       waitlistEnabled,
       bannerUrl,
       registrationEndDate,
+      iconPlayerEnabled,
     } = body;
 
     if (!name || name.trim().length < 2) {
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest) {
       max_teams: teamsInt,
       owner_registration_fee: ownerRegistrationFeePaise,
       waitlist_enabled: waitlistEnabled !== undefined ? Boolean(waitlistEnabled) : true,
+      icon_player_enabled: iconPlayerEnabled !== undefined ? Boolean(iconPlayerEnabled) : false,
       created_by: adminUser.id,
       updated_at: new Date().toISOString(),
     };
