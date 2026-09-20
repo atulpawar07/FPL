@@ -20,7 +20,8 @@ export async function GET(
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 });
     }
 
-    // Count confirmed player registrations (excluding pure OWNER records for player capacity)
+    // Count ALL registrations toward player capacity (PLAYER, OWNER, ICON all count)
+    // Owner IS a player — Owner + Icon consume 2 player slots each
     const { data: allRegistrations } = await supabase
       .from('registrations')
       .select('id, status, registration_status, registration_type')
@@ -30,9 +31,9 @@ export async function GET(
     const isConfirmed = (r: any) => r.status === 'CONFIRMED' || r.registration_status === 'CONFIRMED';
     const isWaitlist = (r: any) => r.status === 'WAITING_LIST' || r.registration_status === 'WAITING_LIST' || r.status === 'PENDING';
 
-    // Player capacity is based on PLAYER and ICON registrations
-    const confirmedPlayerCount = activeRegs.filter(r => isConfirmed(r) && r.registration_type !== 'OWNER').length;
-    const waitlistCount = activeRegs.filter(r => isWaitlist(r) && r.registration_type !== 'OWNER').length;
+    // ALL types count toward player capacity (Owner is a player too)
+    const confirmedPlayerCount = activeRegs.filter(r => isConfirmed(r)).length;
+    const waitlistCount = activeRegs.filter(r => isWaitlist(r)).length;
 
     // Fetch confirmed players squad roster for public display (including ICON and PLAYER registrations)
     const { data: confirmedPlayers } = await supabase

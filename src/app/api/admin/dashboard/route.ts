@@ -46,6 +46,7 @@ export async function GET() {
       const tOwners = (teamOwners || []).filter((o) => o.tournament_id === t.id);
       const ownerCount = tOwners.length;
       const pendingOwners = tOwners.filter((o) => o.status === 'PENDING').length;
+      const maxTeams = t.max_teams || 8;
 
       return {
         ...t,
@@ -59,6 +60,9 @@ export async function GET() {
           revenuePaise,
           ownerCount,
           pendingOwners,
+          ownerSlotsUsed: ownerCount,
+          ownerSlotsTotal: maxTeams,
+          ownerSlotsRemaining: Math.max(0, maxTeams - ownerCount),
         },
       };
     });

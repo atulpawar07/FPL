@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Verify tournament is OWNER_BASED (using select('*') so missing columns on remote DB don't cause error)
+    // ─── 1. FETCH & VALIDATE TOURNAMENT ──────────────────────────────────────
     const { data: tournament, error: tErr } = await supabase
       .from('tournaments')
       .select('*')
@@ -55,10 +55,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Icon Player Name is required for this tournament' }, { status: 400 });
     }
 
-    // Auto-resolve or create Player record for Owner (zero duplicate user profiles & 100% valid FK)
+    // ─── 2. RESOLVE / CREATE OWNER PLAYER PROFILE ────────────────────────────
     let effectiveOwnerPlayerId: string | null = null;
 
-    // 1. Verify if supplied playerId exists in players table (by id or user_id)
+    // 2a. Verify if supplied playerId exists in players table (by id or user_id)
     if (playerId) {
       const { data: pById } = await supabase
         .from('players')
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. If not found by ID, lookup by contact email
+    // 2b. If not found by ID, lookup by contact email
     if (!effectiveOwnerPlayerId && contactEmail) {
       const { data: pByEmail } = await supabase
         .from('players')
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. If still not found, create a new player profile to guarantee FK validity
+    // 2c. If still not found, create a new player profile to guarantee FK validity
     if (!effectiveOwnerPlayerId) {
       const ref = 'OWNER-' + Math.random().toString(36).substring(2, 8).toUpperCase();
       const newPlayerData: any = {
@@ -108,7 +108,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Check team owner capacity (max_teams)
+    // ─── 3. DUPLICATE PREVENTION ─────────────────────────────────────────────
+    // Check if this user/email already has an OWNER registration for this tournament
+    if (effectiveOwnerPlayerId) {
+      const { data: existingOwnerReg } = await supabase
+        .from('registrations')
+        .select('id')
+        .eq('tournament_id', tournamentId)
+        .eq('player_id', effectiveOwnerPlayerId)
+        .in('registration_type', ['OWNER', 'ICON'])
+        .maybeSingle();
+
+      if (existingOwnerReg) {
+        return NextResponse.json({
+          error: 'You are already registered as an Owner or Icon player for this tournament.',
+        }, { status: 400 });
+      }
+    }
+
+    // Also check team_owners table for duplicate email
+    const { data: existingOwner } = await supabase
+      .from('team_owners')
+      .select('id')
+      .eq('tournament_id', tournamentId)
+      .eq('contact_email', contactEmail.trim().toLowerCase())
+      .maybeSingle();
+
+    if (existingOwner) {
+      return NextResponse.json({
+        error: 'An owner with this email is already registered for this tournament.',
+      }, { status: 400 });
+    }
+
+    // ─── 4. ATOMIC DUAL-CAPACITY VALIDATION ──────────────────────────────────
+    // Owner registration consumes:
+    //   - 1 owner/team slot (from max_teams)
+    //   - 2 player slots (Owner entry + Icon entry) from max_players
+
+    // 4a. Check owner/team capacity
     const { count: currentOwnersCount } = await supabase
       .from('team_owners')
       .select('id', { count: 'exact', head: true })
@@ -116,13 +153,34 @@ export async function POST(req: NextRequest) {
 
     const maxTeams = tournament.max_teams || 8;
     if ((currentOwnersCount || 0) >= maxTeams) {
-      return NextResponse.json({ error: `All ${maxTeams} team owner slots for this tournament are already filled.` }, { status: 400 });
+      return NextResponse.json({
+        error: `All ${maxTeams} team owner slots for this tournament are already filled.`,
+      }, { status: 400 });
     }
 
+    // 4b. Check player capacity — Owner + Icon = 2 player slots required
+    const { count: currentPlayerCount } = await supabase
+      .from('registrations')
+      .select('id', { count: 'exact', head: true })
+      .eq('tournament_id', tournamentId)
+      .or('status.eq.CONFIRMED,registration_status.eq.CONFIRMED,status.eq.PENDING,registration_status.eq.PENDING');
+
+    const maxPlayers = tournament.max_players || 100;
+    const playerSlotsNeeded = 2; // Owner (as player) + Icon player
+    const currentPlayers = currentPlayerCount || 0;
+    const availablePlayerSlots = maxPlayers - currentPlayers;
+
+    if (availablePlayerSlots < playerSlotsNeeded) {
+      return NextResponse.json({
+        error: `Insufficient player capacity. Owner registration requires ${playerSlotsNeeded} player slots (Owner + Icon), but only ${Math.max(0, availablePlayerSlots)} slots remain out of ${maxPlayers}. Registration cannot proceed.`,
+      }, { status: 400 });
+    }
+
+    // ─── 5. ALL CAPACITY CHECKS PASSED — BEGIN INSERTS ───────────────────────
     const nextSlot = (currentOwnersCount || 0) + 1;
     const finalTeamName = teamName?.trim() || `Team ${ownerName.trim()}`;
 
-    // 1. Insert Team Owner Record (with fallbacks for missing columns or FK mismatches)
+    // 5a. Insert Team Owner Record
     const ownerPayload: any = {
       tournament_id: tournamentId,
       player_id: effectiveOwnerPlayerId,
@@ -150,7 +208,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertErr && insertErr.message?.includes('column')) {
-      // Fallback 1: strip newly added schema columns if remote DB hasn't run latest SQL migration
+      // Fallback: strip newly added schema columns if remote DB hasn't run latest SQL migration
       delete ownerPayload.team_name;
       delete ownerPayload.team_logo_url;
       delete ownerPayload.owner_is_playing;
@@ -170,7 +228,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (insertErr && insertErr.message?.includes('foreign key constraint')) {
-      // Fallback 2: if player_id FK constraint fails, set player_id to null
+      // Fallback: if player_id FK constraint fails, set player_id to null
       ownerPayload.player_id = null;
       const fkFallbackRes = await supabase
         .from('team_owners')
@@ -189,7 +247,7 @@ export async function POST(req: NextRequest) {
     let ownerRegistrationId: string | null = null;
     let iconRegistrationId: string | null = null;
 
-    // 2. Create OWNER Registration record in registrations table
+    // 5b. Create OWNER Registration record (counts as 1 player slot toward max_players)
     if (effectiveOwnerPlayerId) {
       const ownerRegRef = 'OWNER-REG-' + Math.random().toString(36).substring(2, 8).toUpperCase();
       const { data: ownerRegData, error: ownerRegErr } = await supabase
@@ -232,7 +290,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Create ICON Player Profile & ICON Registration record in registrations table
+    // 5c. Create ICON Player Profile & ICON Registration record (counts as 1 player slot toward max_players)
     const targetIconName = iconPlayerName?.trim() || ownerName.trim();
     let effectiveIconPlayerId: string | null = null;
 
@@ -264,6 +322,7 @@ export async function POST(req: NextRequest) {
           player_id: effectiveIconPlayerId,
           registration_reference: iconRegRef,
           status: 'CONFIRMED',
+          registration_status: 'CONFIRMED',
           registration_type: 'ICON',
           team_name: finalTeamName,
           team_owner_id: newOwner.id,
@@ -283,7 +342,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Update team_owners with created registration IDs if column exists
+    // 5d. Update team_owners with created registration IDs if column exists
     if (ownerRegistrationId || iconRegistrationId) {
       await supabase
         .from('team_owners')
@@ -294,17 +353,25 @@ export async function POST(req: NextRequest) {
         .eq('id', newOwner.id);
     }
 
+    // ─── 6. RESPOND WITH CAPACITY SUMMARY ────────────────────────────────────
     return NextResponse.json({
       success: true,
       ownerId: newOwner.id,
       slotNumber: nextSlot,
       teamName: finalTeamName,
       status: 'PENDING',
-      message: `Registered as Team Owner #${nextSlot} ("${finalTeamName}") successfully! Registered as Owner and Icon Player.`,
+      capacitySummary: {
+        ownerSlotsUsed: nextSlot,
+        ownerSlotsTotal: maxTeams,
+        ownerSlotsRemaining: maxTeams - nextSlot,
+        playerSlotsUsed: currentPlayers + playerSlotsNeeded,
+        playerSlotsTotal: maxPlayers,
+        playerSlotsRemaining: maxPlayers - (currentPlayers + playerSlotsNeeded),
+      },
+      message: `Registered as Team Owner #${nextSlot} ("${finalTeamName}") successfully! Owner and Icon Player both registered (2 player slots consumed). Owner slots: ${nextSlot}/${maxTeams}, Player slots: ${currentPlayers + playerSlotsNeeded}/${maxPlayers}.`,
     });
   } catch (err: any) {
     console.error('Owner Registration error:', err);
     return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }
-

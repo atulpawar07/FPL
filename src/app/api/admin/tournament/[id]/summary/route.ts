@@ -91,14 +91,17 @@ export async function GET(
     const isConfirmedReg = (r: any) => r.status === 'CONFIRMED' || r.registration_status === 'CONFIRMED';
     const isWaitlistReg = (r: any) => r.status === 'WAITING_LIST' || r.registration_status === 'WAITING_LIST' || r.status === 'PENDING';
 
-    const confirmedPlayersCount = enrichedRegistrations.filter((r) => isConfirmedReg(r) && r.registration_type !== 'OWNER').length;
-    const waitlistCount = enrichedRegistrations.filter((r) => isWaitlistReg(r) && r.registration_type !== 'OWNER').length;
+    // ALL types count toward player capacity (Owner is a player too)
+    const confirmedPlayersCount = enrichedRegistrations.filter((r) => isConfirmedReg(r)).length;
+    const waitlistCount = enrichedRegistrations.filter((r) => isWaitlistReg(r)).length;
     const ownerRegistrationsCount = enrichedRegistrations.filter((r) => r.registration_type === 'OWNER').length;
     const iconRegistrationsCount = enrichedRegistrations.filter((r) => r.registration_type === 'ICON').length;
     const standardPlayersCount = enrichedRegistrations.filter((r) => r.registration_type === 'PLAYER' || !r.registration_type).length;
 
     const successfulPayments = payments.filter((p) => p.payment_status === 'SUCCESSFUL').length;
     const pendingPayments = payments.filter((p) => p.payment_status === 'PENDING').length;
+
+    const maxTeams = tournament.max_teams || 8;
 
     return NextResponse.json({
       tournament,
@@ -114,6 +117,9 @@ export async function GET(
         ownerRegistrationsCount,
         iconRegistrationsCount,
         standardPlayersCount,
+        ownerSlotsUsed: teamOwners.length,
+        ownerSlotsTotal: maxTeams,
+        ownerSlotsRemaining: Math.max(0, maxTeams - teamOwners.length),
         successfulPayments,
         pendingPayments,
       },
