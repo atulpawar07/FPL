@@ -30,7 +30,11 @@ export async function GET(
         tournament_id,
         player_id,
         registration_number,
+        status,
         registration_status,
+        registration_type,
+        team_name,
+        team_owner_id,
         waitlist_position,
         registered_name_snapshot,
         registered_role_snapshot,
@@ -75,14 +79,24 @@ export async function GET(
     // Combine registrations with payments
     const enrichedRegistrations = (registrations || []).map((r) => {
       const payment = payments.find((p) => p.registration_id === r.id) || null;
+      const effectiveStatus = r.status || r.registration_status || 'PENDING';
       return {
         ...r,
+        registration_status: effectiveStatus,
+        status: effectiveStatus,
         payment,
       };
     });
 
-    const confirmedCount = enrichedRegistrations.filter((r) => r.registration_status === 'CONFIRMED').length;
-    const waitlistCount = enrichedRegistrations.filter((r) => r.registration_status === 'WAITING_LIST').length;
+    const isConfirmedReg = (r: any) => r.status === 'CONFIRMED' || r.registration_status === 'CONFIRMED';
+    const isWaitlistReg = (r: any) => r.status === 'WAITING_LIST' || r.registration_status === 'WAITING_LIST' || r.status === 'PENDING';
+
+    const confirmedPlayersCount = enrichedRegistrations.filter((r) => isConfirmedReg(r) && r.registration_type !== 'OWNER').length;
+    const waitlistCount = enrichedRegistrations.filter((r) => isWaitlistReg(r) && r.registration_type !== 'OWNER').length;
+    const ownerRegistrationsCount = enrichedRegistrations.filter((r) => r.registration_type === 'OWNER').length;
+    const iconRegistrationsCount = enrichedRegistrations.filter((r) => r.registration_type === 'ICON').length;
+    const standardPlayersCount = enrichedRegistrations.filter((r) => r.registration_type === 'PLAYER' || !r.registration_type).length;
+
     const successfulPayments = payments.filter((p) => p.payment_status === 'SUCCESSFUL').length;
     const pendingPayments = payments.filter((p) => p.payment_status === 'PENDING').length;
 
@@ -94,9 +108,12 @@ export async function GET(
       isAdmin,
       stats: {
         totalRegistered: enrichedRegistrations.length,
-        confirmedCount,
+        confirmedCount: confirmedPlayersCount,
         waitlistCount,
-        availableSlots: Math.max(0, tournament.max_players - confirmedCount),
+        availableSlots: Math.max(0, tournament.max_players - confirmedPlayersCount),
+        ownerRegistrationsCount,
+        iconRegistrationsCount,
+        standardPlayersCount,
         successfulPayments,
         pendingPayments,
       },

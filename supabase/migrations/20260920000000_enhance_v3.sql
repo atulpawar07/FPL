@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS team_owners (
 );
 
 ALTER TABLE team_owners ALTER COLUMN player_id DROP NOT NULL;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS team_name TEXT;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS team_logo_url TEXT;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS owner_registration_id UUID REFERENCES registrations(id) ON DELETE SET NULL;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_registration_id UUID REFERENCES registrations(id) ON DELETE SET NULL;
 ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS owner_is_playing BOOLEAN DEFAULT true;
 ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS owner_cricket_role TEXT DEFAULT 'BATSMAN';
 ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_name TEXT;
@@ -65,8 +69,10 @@ ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_role TEXT;
 ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_batting_style TEXT;
 ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_bowling_style TEXT;
 
--- Registrations table enhancement
-ALTER TABLE registrations ADD COLUMN IF NOT EXISTS registration_type TEXT DEFAULT 'REGULAR';
+-- Registrations table enhancement: PLAYER, OWNER, ICON tags
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS registration_type TEXT DEFAULT 'PLAYER';
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS team_name TEXT;
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS team_owner_id UUID REFERENCES team_owners(id) ON DELETE SET NULL;
 
 -- Refresh Supabase PostgREST schema cache
 NOTIFY pgrst, 'reload schema';

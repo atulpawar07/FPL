@@ -11,6 +11,8 @@ export async function POST(req: NextRequest) {
       contactPhone,
       playerId,
       paymentScreenshotUrl,
+      teamName,
+      teamLogoUrl,
       iconPlayerName,
       iconPlayerMobile,
       iconPlayerRole,
@@ -28,7 +30,7 @@ export async function POST(req: NextRequest) {
     // Verify tournament is OWNER_BASED
     const { data: tournament, error: tErr } = await supabase
       .from('tournaments')
-      .select('id, name, max_teams, owner_registration_fee, tournament_type, icon_player_enabled, owner_is_playing_enabled')
+      .select('id, name, max_teams, max_players, owner_registration_fee, tournament_type, icon_player_enabled, owner_is_playing_enabled')
       .eq('id', tournamentId)
       .maybeSingle();
 
@@ -45,13 +47,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This tournament does not accept team owner registrations' }, { status: 400 });
     }
 
-    if (tournament.icon_player_enabled && !iconPlayerName?.trim()) {
+    if (tournament.icon_player_enabled && !iconPlayerName?.trim() && !ownerIsPlaying) {
       return NextResponse.json({ error: 'Icon Player Name is required for this tournament' }, { status: 400 });
     }
 
-    // Auto-resolve or create Player record if playerId not supplied
-    let effectivePlayerId: string | null = playerId || null;
-    if (!effectivePlayerId) {
+    // Auto-resolve or create Player record for Owner (zero duplicate user profiles)
+    let effectiveOwnerPlayerId: string | null = playerId || null;
+    if (!effectiveOwnerPlayerId) {
       const { data: existingPlayer } = await supabase
         .from('players')
         .select('id')
@@ -59,9 +61,8 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (existingPlayer?.id) {
-        effectivePlayerId = existingPlayer.id;
+        effectiveOwnerPlayerId = existingPlayer.id;
       } else {
-        // Upsert a lightweight player profile for the owner
         const ref = 'OWNER-' + Math.random().toString(36).substring(2, 8).toUpperCase();
         const { data: createdPlayer } = await supabase
           .from('players')
@@ -74,14 +75,12 @@ export async function POST(req: NextRequest) {
           .select('id')
           .single();
         if (createdPlayer?.id) {
-          effectivePlayerId = createdPlayer.id;
+          effectiveOwnerPlayerId = createdPlayer.id;
         }
       }
     }
 
-    const isPlayingOwner = ownerIsPlaying !== false && tournament.owner_is_playing_enabled !== false;
-
-    // Direct insert owner record
+    // Check team owner capacity (max_teams)
     const { count: currentOwnersCount } = await supabase
       .from('team_owners')
       .select('id', { count: 'exact', head: true })
@@ -93,25 +92,29 @@ export async function POST(req: NextRequest) {
     }
 
     const nextSlot = (currentOwnersCount || 0) + 1;
+    const finalTeamName = teamName?.trim() || `Team ${ownerName.trim()}`;
 
+    // 1. Insert Team Owner Record
     const { data: newOwner, error: insertErr } = await supabase
       .from('team_owners')
       .insert({
         tournament_id: tournamentId,
-        player_id: effectivePlayerId,
-        owner_name: ownerName,
-        contact_email: contactEmail,
+        player_id: effectiveOwnerPlayerId,
+        team_name: finalTeamName,
+        team_logo_url: teamLogoUrl || null,
+        owner_name: ownerName.trim(),
+        contact_email: contactEmail.trim().toLowerCase(),
         contact_phone: contactPhone || null,
         slot_number: nextSlot,
         status: 'PENDING',
         payment_status: 'PENDING',
         payment_screenshot_url: paymentScreenshotUrl || null,
-        owner_is_playing: isPlayingOwner,
+        owner_is_playing: ownerIsPlaying !== false,
         owner_cricket_role: ownerCricketRole || 'BATSMAN',
-        icon_player_name: iconPlayerName || null,
-        icon_player_mobile: iconPlayerMobile || null,
-        icon_player_role: iconPlayerRole || null,
-        icon_player_batting_style: iconPlayerBattingStyle || null,
+        icon_player_name: iconPlayerName?.trim() || ownerName.trim(),
+        icon_player_mobile: iconPlayerMobile || contactPhone || null,
+        icon_player_role: iconPlayerRole || ownerCricketRole || 'BATSMAN',
+        icon_player_batting_style: iconPlayerBattingStyle || 'RIGHT_HAND',
       })
       .select()
       .single();
@@ -121,70 +124,108 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: insertErr.message || 'Failed to insert team owner record' }, { status: 500 });
     }
 
-    // AUTO-ADD TO PLAYER ROSTER:
-    // 1. If Team Owner is playing as a player, add to registrations table
-    if (isPlayingOwner && effectivePlayerId) {
+    let ownerRegistrationId: string | null = null;
+    let iconRegistrationId: string | null = null;
+
+    // 2. Create OWNER Registration record in registrations table
+    if (effectiveOwnerPlayerId) {
       const ownerRegRef = 'OWNER-REG-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-      try {
-        await supabase.from('registrations').upsert({
+      const { data: ownerRegData, error: ownerRegErr } = await supabase
+        .from('registrations')
+        .insert({
           tournament_id: tournamentId,
-          player_id: effectivePlayerId,
+          player_id: effectiveOwnerPlayerId,
           registration_reference: ownerRegRef,
-          status: 'CONFIRMED',
-          registration_type: 'TEAM_OWNER',
-          registered_name_snapshot: `${ownerName.trim()} (👑 Owner - Slot #${nextSlot})`,
-          registered_role_snapshot: ownerCricketRole || 'BATSMAN',
+          status: 'PENDING',
+          registration_type: 'OWNER',
+          team_name: finalTeamName,
+          team_owner_id: newOwner.id,
+          registered_name_snapshot: `${ownerName.trim()}`,
+          registered_role_snapshot: ownerCricketRole || 'ALL_ROUNDER',
           registered_at: new Date().toISOString(),
-        }, { onConflict: 'tournament_id,player_id' });
-      } catch (err) {
-        console.error('Owner registration insert err:', err);
+        })
+        .select('id')
+        .single();
+
+      if (ownerRegErr) {
+        console.warn('Could not insert OWNER registration record (falling back):', ownerRegErr.message);
+      } else {
+        ownerRegistrationId = ownerRegData?.id || null;
       }
     }
 
-    // 2. If Icon Player is provided, create player profile and add to registrations table
-    if (iconPlayerName?.trim()) {
-      const iconRef = 'ICON-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-      const iconEmail = `icon-${nextSlot}-${Date.now()}@fairplay.com`;
+    // 3. Create ICON Player Profile & ICON Registration record in registrations table
+    const targetIconName = iconPlayerName?.trim() || ownerName.trim();
+    let effectiveIconPlayerId: string | null = null;
 
+    if (iconPlayerName?.trim() && iconPlayerName.trim().toLowerCase() !== ownerName.trim().toLowerCase()) {
+      // Create separate player profile for designated Icon player
+      const iconEmail = `icon-${nextSlot}-${Date.now()}@fairplay.com`;
       const { data: iconPlayer } = await supabase
         .from('players')
         .insert({
-          registration_reference: iconRef,
-          full_name: iconPlayerName.trim(),
+          registration_reference: 'ICON-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+          full_name: targetIconName,
           email: iconEmail,
           mobile: iconPlayerMobile || '0000000000',
         })
         .select('id')
         .single();
+      effectiveIconPlayerId = iconPlayer?.id || null;
+    } else {
+      // Owner is the Icon player
+      effectiveIconPlayerId = effectiveOwnerPlayerId;
+    }
 
-      if (iconPlayer?.id) {
-        try {
-          await supabase.from('registrations').insert({
-            tournament_id: tournamentId,
-            player_id: iconPlayer.id,
-            registration_reference: 'ICON-REG-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-            status: 'CONFIRMED',
-            registration_type: 'ICON_PLAYER',
-            registered_name_snapshot: `${iconPlayerName.trim()} (⭐ Icon Player - Slot #${nextSlot})`,
-            registered_role_snapshot: iconPlayerRole || 'BATSMAN',
-            registered_batting_style_snapshot: iconPlayerBattingStyle || 'RIGHT_HAND',
-            registered_at: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.error('Icon player registration insert err:', err);
-        }
+    if (effectiveIconPlayerId) {
+      const iconRegRef = 'ICON-REG-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      const { data: iconRegData, error: iconRegErr } = await supabase
+        .from('registrations')
+        .insert({
+          tournament_id: tournamentId,
+          player_id: effectiveIconPlayerId,
+          registration_reference: iconRegRef,
+          status: 'CONFIRMED',
+          registration_type: 'ICON',
+          team_name: finalTeamName,
+          team_owner_id: newOwner.id,
+          registered_name_snapshot: `${targetIconName}`,
+          registered_role_snapshot: iconPlayerRole || ownerCricketRole || 'BATSMAN',
+          registered_batting_style_snapshot: iconPlayerBattingStyle || 'RIGHT_HAND',
+          registered_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (iconRegErr) {
+        console.warn('Could not insert ICON registration record (falling back):', iconRegErr.message);
+      } else {
+        iconRegistrationId = iconRegData?.id || null;
       }
+    }
+
+    // Update team_owners with created registration IDs if column exists
+    if (ownerRegistrationId || iconRegistrationId) {
+      await supabase
+        .from('team_owners')
+        .update({
+          owner_registration_id: ownerRegistrationId,
+          icon_registration_id: iconRegistrationId,
+        })
+        .eq('id', newOwner.id);
     }
 
     return NextResponse.json({
       success: true,
       ownerId: newOwner.id,
       slotNumber: nextSlot,
+      teamName: finalTeamName,
       status: 'PENDING',
-      message: `Registered as Team Owner #${nextSlot} successfully! ${isPlayingOwner ? 'Added to Player Roster as Playing Owner.' : ''} ${iconPlayerName?.trim() ? 'Icon Player added to Roster.' : ''}`,
+      message: `Registered as Team Owner #${nextSlot} ("${finalTeamName}") successfully! Registered as Owner and Icon Player.`,
     });
   } catch (err: any) {
     console.error('Owner Registration error:', err);
     return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }
+

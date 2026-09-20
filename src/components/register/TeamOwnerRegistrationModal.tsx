@@ -27,6 +27,10 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
   const [contactPhone, setContactPhone] = useState('');
   const [screenshotUrl, setScreenshotUrl] = useState('');
 
+  // Team Info State
+  const [teamName, setTeamName] = useState('');
+  const [teamLogoUrl, setTeamLogoUrl] = useState('');
+
   // Owner playing state
   const [ownerIsPlaying, setOwnerIsPlaying] = useState(true);
   const [ownerCricketRole, setOwnerCricketRole] = useState('BATSMAN');
@@ -54,8 +58,8 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ownerName || !contactEmail) {
-      setErrorMsg('Owner Name and Contact Email are required');
+    if (!ownerName || !contactEmail || !teamName.trim()) {
+      setErrorMsg('Team Name, Owner Name, and Contact Email are required');
       return;
     }
 
@@ -79,6 +83,8 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tournamentId: tournament.id,
+          teamName: teamName.trim(),
+          teamLogoUrl: teamLogoUrl.trim() || null,
           ownerName,
           contactEmail,
           contactPhone,
@@ -146,8 +152,27 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
           </div>
         )}
 
+        {/* TEAM DETAILS */}
+        <div className="p-3.5 bg-amber-950/30 border border-amber-500/30 rounded-2xl space-y-3">
+          <Input
+            label="Team / Franchise Name *"
+            required
+            value={teamName}
+            onChange={(e) => setTeamName(e.target.value)}
+            placeholder="e.g. Royal Strikers Mumbai"
+          />
+
+          <Input
+            label="Team Logo Image URL (Optional)"
+            type="url"
+            value={teamLogoUrl}
+            onChange={(e) => setTeamLogoUrl(e.target.value)}
+            placeholder="https://example.com/logo.png"
+          />
+        </div>
+
         <Input
-          label="Team Owner Full Name"
+          label="Team Owner Full Name *"
           required
           value={ownerName}
           onChange={(e) => setOwnerName(e.target.value)}
@@ -155,7 +180,7 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
         />
 
         <Input
-          label="Contact Email"
+          label="Contact Email *"
           type="email"
           required
           value={contactEmail}

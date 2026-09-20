@@ -497,24 +497,30 @@ export default function PublicTournamentPage() {
                             <span className="font-mono text-[11px] font-bold text-emerald-400">
                               {playerItem.registration_number}
                             </span>
-                            {playerItem.registration_type === 'TEAM_OWNER' ? (
+                            {playerItem.registration_type === 'OWNER' || playerItem.registration_type === 'TEAM_OWNER' ? (
                               <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-2 py-0.5 rounded-full border border-amber-500/40">
                                 👑 Team Owner
                               </span>
-                            ) : playerItem.registration_type === 'ICON_PLAYER' ? (
+                            ) : playerItem.registration_type === 'ICON' || playerItem.registration_type === 'ICON_PLAYER' ? (
                               <span className="text-[10px] font-bold text-teal-300 bg-teal-950 px-2 py-0.5 rounded-full border border-teal-500/40">
                                 ⭐ Icon Player
                               </span>
                             ) : isCurrentUser ? (
                               <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/40">
-                                🎉 Your Entry
+                                🏏 Your Entry
                               </span>
                             ) : (
                               <span className="text-[10px] font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800">
-                                Confirmed
+                                🏏 Player
                               </span>
                             )}
                           </div>
+
+                          {playerItem.team_name && (
+                            <div className="text-[11px] font-semibold text-amber-300/90 bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-500/20 w-max">
+                              🛡️ {playerItem.team_name}
+                            </div>
+                          )}
 
                           <div className="flex items-center gap-3">
                             {playerItem.registered_image_snapshot ? (

@@ -295,6 +295,7 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
                   <tr>
                     <th className="p-3">Ref #</th>
                     <th className="p-3">Player</th>
+                    <th className="p-3">Type / Team</th>
                     <th className="p-3">Role</th>
                     <th className="p-3">Status</th>
                     <th className="p-3">Waitlist Pos</th>
@@ -318,6 +319,26 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
                             <span className="text-[10px] text-slate-400 block">{r.players?.email}</span>
                           </div>
                         </div>
+                      </td>
+                      <td className="p-3">
+                        {r.registration_type === 'OWNER' || r.registration_type === 'TEAM_OWNER' ? (
+                          <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-2 py-0.5 rounded-full border border-amber-500/40 inline-block mb-1">
+                            👑 Owner
+                          </span>
+                        ) : r.registration_type === 'ICON' || r.registration_type === 'ICON_PLAYER' ? (
+                          <span className="text-[10px] font-bold text-teal-300 bg-teal-950 px-2 py-0.5 rounded-full border border-teal-500/40 inline-block mb-1">
+                            ⭐ Icon
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800 inline-block mb-1">
+                            🏏 Player
+                          </span>
+                        )}
+                        {r.team_name && (
+                          <span className="text-[10px] font-semibold text-amber-300 block">
+                            🛡️ {r.team_name}
+                          </span>
+                        )}
                       </td>
                       <td className="p-3 font-semibold">{r.registered_role_snapshot}</td>
                       <td className="p-3">
@@ -364,10 +385,19 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-white text-base">{r.registered_name_snapshot}</span>
+                        {r.registration_type === 'OWNER' ? (
+                          <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-2 py-0.5 rounded-full border border-amber-500/40">
+                            👑 Owner
+                          </span>
+                        ) : r.registration_type === 'ICON' ? (
+                          <span className="text-[10px] font-bold text-teal-300 bg-teal-950 px-2 py-0.5 rounded-full border border-teal-500/40">
+                            ⭐ Icon Player
+                          </span>
+                        ) : null}
                         <Badge status={r.registration_status}>{r.registration_status}</Badge>
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Ref: <code className="text-emerald-400 font-bold">{r.registration_number}</code> | Role: {r.registered_role_snapshot} | Batting: {r.registered_batting_style_snapshot || 'Right Hand'}
+                        Ref: <code className="text-emerald-400 font-bold">{r.registration_number}</code> | Role: {r.registered_role_snapshot} {r.team_name ? `| Team: ${r.team_name}` : ''}
                       </p>
                       <p className="text-[11px] text-slate-500 mt-0.5">
                         Email: {r.players?.email} | Payment: <span className="font-bold text-amber-400">{r.payment?.payment_status || 'PENDING'}</span>
@@ -426,14 +456,35 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {teamOwners.map((o) => (
-                <div key={o.id} className="p-4 bg-slate-950 rounded-2xl border border-amber-500/30 space-y-2">
+                <div key={o.id} className="p-4 bg-slate-950 rounded-2xl border border-amber-500/30 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-amber-400">Team Slot #{o.slot_number}</span>
                     <Badge status={o.status === 'APPROVED' ? 'CONFIRMED' : 'WAITING_LIST'}>{o.status}</Badge>
                   </div>
-                  <h3 className="font-extrabold text-white text-base">{o.owner_name}</h3>
-                  <p className="text-xs text-slate-400">Email: {o.contact_email}</p>
-                  {o.contact_phone && <p className="text-xs text-slate-400">Phone: {o.contact_phone}</p>}
+                  
+                  <div className="flex items-center gap-3">
+                    {o.team_logo_url ? (
+                      <img src={o.team_logo_url} alt="" className="w-10 h-10 rounded-xl object-contain bg-slate-900 border border-slate-800 shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-amber-950/60 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shrink-0">
+                        🛡️
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-extrabold text-white text-base">{o.team_name || o.owner_name}</h3>
+                      <span className="text-xs text-slate-300 font-medium">Owner: {o.owner_name}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-slate-400 space-y-1 pt-2 border-t border-slate-800">
+                    <p>Email: {o.contact_email}</p>
+                    {o.contact_phone && <p>Phone: {o.contact_phone}</p>}
+                    {o.icon_player_name && (
+                      <p className="text-teal-300 font-semibold pt-1">
+                        ⭐ Icon Player: {o.icon_player_name} ({o.icon_player_role || 'Batsman'})
+                      </p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
