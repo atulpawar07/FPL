@@ -15,7 +15,8 @@ ALTER TABLE tournaments
   ADD COLUMN IF NOT EXISTS waitlist_enabled BOOLEAN DEFAULT true,
   ADD COLUMN IF NOT EXISTS banner_url TEXT,
   ADD COLUMN IF NOT EXISTS registration_end_date TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS icon_player_enabled BOOLEAN DEFAULT false;
+  ADD COLUMN IF NOT EXISTS icon_player_enabled BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS owner_is_playing_enabled BOOLEAN DEFAULT true;
 
 -- 2. Create Managers Table
 CREATE TABLE IF NOT EXISTS managers (
@@ -44,6 +45,8 @@ CREATE TABLE IF NOT EXISTS team_owners (
   status TEXT NOT NULL DEFAULT 'PENDING',
   payment_status TEXT NOT NULL DEFAULT 'PENDING',
   payment_screenshot_url TEXT,
+  owner_is_playing BOOLEAN DEFAULT true,
+  owner_cricket_role TEXT DEFAULT 'BATSMAN',
   icon_player_name TEXT,
   icon_player_mobile TEXT,
   icon_player_role TEXT,
@@ -54,11 +57,16 @@ CREATE TABLE IF NOT EXISTS team_owners (
 );
 
 ALTER TABLE team_owners ALTER COLUMN player_id DROP NOT NULL;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS owner_is_playing BOOLEAN DEFAULT true;
+ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS owner_cricket_role TEXT DEFAULT 'BATSMAN';
 ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_name TEXT;
 ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_mobile TEXT;
 ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_role TEXT;
 ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_batting_style TEXT;
 ALTER TABLE team_owners ADD COLUMN IF NOT EXISTS icon_player_bowling_style TEXT;
+
+-- Registrations table enhancement
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS registration_type TEXT DEFAULT 'REGULAR';
 
 -- Refresh Supabase PostgREST schema cache
 NOTIFY pgrst, 'reload schema';

@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       bannerUrl,
       registrationEndDate,
       iconPlayerEnabled,
+      ownerIsPlayingEnabled,
     } = body;
 
     if (!name || name.trim().length < 2) {
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest) {
       owner_registration_fee: ownerRegistrationFeePaise,
       waitlist_enabled: waitlistEnabled !== undefined ? Boolean(waitlistEnabled) : true,
       icon_player_enabled: iconPlayerEnabled !== undefined ? Boolean(iconPlayerEnabled) : false,
+      owner_is_playing_enabled: ownerIsPlayingEnabled !== undefined ? Boolean(ownerIsPlayingEnabled) : true,
       created_by: adminUser.id,
       updated_at: new Date().toISOString(),
     };

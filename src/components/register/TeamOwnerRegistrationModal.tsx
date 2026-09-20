@@ -27,6 +27,10 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
   const [contactPhone, setContactPhone] = useState('');
   const [screenshotUrl, setScreenshotUrl] = useState('');
 
+  // Owner playing state
+  const [ownerIsPlaying, setOwnerIsPlaying] = useState(true);
+  const [ownerCricketRole, setOwnerCricketRole] = useState('BATSMAN');
+
   // Icon Player state
   const [iconPlayerName, setIconPlayerName] = useState('');
   const [iconPlayerMobile, setIconPlayerMobile] = useState('');
@@ -55,6 +59,11 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
       return;
     }
 
+    if (!tournament?.id) {
+      setErrorMsg('Tournament ID missing. Please reload the page.');
+      return;
+    }
+
     if (tournament?.icon_player_enabled && !iconPlayerName.trim()) {
       setErrorMsg('Icon Player Name is required for this tournament');
       return;
@@ -75,6 +84,8 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
           contactPhone,
           playerId: currentUser?.id,
           paymentScreenshotUrl: screenshotUrl,
+          ownerIsPlaying,
+          ownerCricketRole,
           iconPlayerName,
           iconPlayerMobile,
           iconPlayerRole,
@@ -93,7 +104,8 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
       setSubmitting(false);
       setTimeout(() => {
         onClose();
-      }, 2000);
+        window.location.reload();
+      }, 1800);
     } catch (err: any) {
       setErrorMsg('Network error submitting Team Owner registration');
       setSubmitting(false);
@@ -105,6 +117,7 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
     : '₹0';
 
   const isIconRequired = Boolean(tournament?.icon_player_enabled);
+  const isOwnerPlayingAllowed = tournament?.owner_is_playing_enabled !== false;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="👑 Team Owner Registration" maxWidth="md">
@@ -157,6 +170,46 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
           onChange={(e) => setContactPhone(e.target.value)}
           placeholder="9876543210"
         />
+
+        {/* OWNER PLAYING PREFERENCE */}
+        {isOwnerPlayingAllowed && (
+          <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={ownerIsPlaying}
+                onChange={(e) => setOwnerIsPlaying(e.target.checked)}
+                className="w-4 h-4 accent-amber-500 rounded"
+              />
+              <div>
+                <span className="font-extrabold text-amber-300 text-xs block">
+                  🏏 Register Team Owner as a Playing Player in Tournament
+                </span>
+                <span className="text-[10px] text-slate-400 block">
+                  Checked: You will be registered into the player list as a playing Team Owner.
+                </span>
+              </div>
+            </label>
+
+            {ownerIsPlaying && (
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">
+                  Owner Playing Role
+                </label>
+                <select
+                  value={ownerCricketRole}
+                  onChange={(e) => setOwnerCricketRole(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl p-2.5 text-xs focus:ring-1 focus:ring-amber-500"
+                >
+                  <option value="BATSMAN">Batsman</option>
+                  <option value="BOWLER">Bowler</option>
+                  <option value="ALL_ROUNDER">All-Rounder</option>
+                  <option value="BATSMAN_WICKETKEEPER">Wicketkeeper-Batsman</option>
+                </select>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ICON PLAYER SECTION */}
         <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-3">

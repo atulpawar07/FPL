@@ -57,6 +57,7 @@ export default function AdminDashboardPage() {
   const [tMaxTeams, setTMaxTeams] = useState(8);
   const [tOwnerFeeRupees, setTOwnerFeeRupees] = useState(2500);
   const [tIconPlayerEnabled, setTIconPlayerEnabled] = useState(false);
+  const [tOwnerIsPlayingEnabled, setTOwnerIsPlayingEnabled] = useState(true);
   const [tWaitlistEnabled, setTWaitlistEnabled] = useState(true);
   const [tUpiId, setTUpiId] = useState('');
   const [tPaymentQrUrl, setTPaymentQrUrl] = useState('');
@@ -104,6 +105,7 @@ export default function AdminDashboardPage() {
     setTMaxTeams(8);
     setTOwnerFeeRupees(2500);
     setTIconPlayerEnabled(false);
+    setTOwnerIsPlayingEnabled(true);
     setTWaitlistEnabled(true);
     setTUpiId('');
     setTPaymentQrUrl('');
@@ -124,6 +126,7 @@ export default function AdminDashboardPage() {
     setTMaxTeams(t.max_teams || 8);
     setTOwnerFeeRupees((t.owner_registration_fee || 250000) / 100);
     setTIconPlayerEnabled(Boolean(t.icon_player_enabled));
+    setTOwnerIsPlayingEnabled(t.owner_is_playing_enabled !== false);
     setTWaitlistEnabled(t.waitlist_enabled !== false);
     setTUpiId(t.upi_id || '');
     setTPaymentQrUrl(t.payment_qr_url || '');
@@ -176,6 +179,7 @@ export default function AdminDashboardPage() {
           maxTeams: tMaxTeams,
           ownerRegistrationFeeRupees: tOwnerFeeRupees,
           iconPlayerEnabled: tIconPlayerEnabled,
+          ownerIsPlayingEnabled: tOwnerIsPlayingEnabled,
           waitlistEnabled: tWaitlistEnabled,
           upiId: tUpiId,
           paymentQrUrl: tPaymentQrUrl,
@@ -565,22 +569,41 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer pt-1 border-t border-amber-500/20">
-                <input
-                  type="checkbox"
-                  checked={tIconPlayerEnabled}
-                  onChange={(e) => setTIconPlayerEnabled(e.target.checked)}
-                  className="w-4 h-4 accent-amber-500 rounded"
-                />
-                <div>
-                  <span className="text-xs font-bold text-amber-300 block">
-                    👑 Require Icon Player Registration for Team Owners
-                  </span>
-                  <span className="text-[10px] text-slate-400 block">
-                    When checked, team owners will be required to register their squad's Icon Player.
-                  </span>
-                </div>
-              </label>
+              <div className="space-y-2 pt-2 border-t border-amber-500/20">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tOwnerIsPlayingEnabled}
+                    onChange={(e) => setTOwnerIsPlayingEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-amber-500 rounded"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-amber-300 block">
+                      🏏 Allow Team Owners to Play as Players in Tournament Roster
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">
+                      When enabled, owners can choose to play as a player and will be automatically added to the confirmed roster.
+                    </span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer pt-1 border-t border-amber-500/20">
+                  <input
+                    type="checkbox"
+                    checked={tIconPlayerEnabled}
+                    onChange={(e) => setTIconPlayerEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-amber-500 rounded"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-amber-300 block">
+                      ⭐ Require Icon Player Registration for Team Owners
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">
+                      When checked, team owners will register their squad's Icon Player into the tournament roster.
+                    </span>
+                  </div>
+                </label>
+              </div>
             </div>
           )}
 

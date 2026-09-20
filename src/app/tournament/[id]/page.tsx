@@ -497,7 +497,15 @@ export default function PublicTournamentPage() {
                             <span className="font-mono text-[11px] font-bold text-emerald-400">
                               {playerItem.registration_number}
                             </span>
-                            {isCurrentUser ? (
+                            {playerItem.registration_type === 'TEAM_OWNER' ? (
+                              <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-2 py-0.5 rounded-full border border-amber-500/40">
+                                👑 Team Owner
+                              </span>
+                            ) : playerItem.registration_type === 'ICON_PLAYER' ? (
+                              <span className="text-[10px] font-bold text-teal-300 bg-teal-950 px-2 py-0.5 rounded-full border border-teal-500/40">
+                                ⭐ Icon Player
+                              </span>
+                            ) : isCurrentUser ? (
                               <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/40">
                                 🎉 Your Entry
                               </span>

@@ -51,6 +51,7 @@ export interface DbTournament {
   banner_url?: string | null;
   registration_end_date?: string | null;
   icon_player_enabled?: boolean;
+  owner_is_playing_enabled?: boolean;
 }
 
 export interface DbTeamOwner {
@@ -64,6 +65,8 @@ export interface DbTeamOwner {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   payment_status: PaymentStatus;
   payment_screenshot_url: string | null;
+  owner_is_playing?: boolean;
+  owner_cricket_role?: string | null;
   icon_player_name?: string | null;
   icon_player_mobile?: string | null;
   icon_player_role?: string | null;
@@ -88,6 +91,7 @@ export interface DbRegistration {
   player_id: string;
   registration_number: string;
   registration_status: RegistrationStatus;
+  registration_type?: 'REGULAR' | 'TEAM_OWNER' | 'ICON_PLAYER';
   waitlist_position: number | null;
   registered_name_snapshot: string;
   registered_role_snapshot: CricketRole;
