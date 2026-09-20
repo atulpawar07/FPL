@@ -20,8 +20,8 @@ export const playerProfileSchema = z.object({
   email: z.string().email('Valid email is required'),
   profileImageUrl: z.string().min(1, 'Please upload your profile photo to complete registration'),
   cricketRole: cricketRolesEnum,
-  battingStyle: battingStylesEnum.optional(),
-  jerseySize: jerseySizesEnum.optional(),
+  battingStyle: battingStylesEnum,
+  jerseySize: jerseySizesEnum,
 });
 
 export const tournamentRegistrationSchema = playerProfileSchema.extend({

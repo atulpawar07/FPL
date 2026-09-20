@@ -10,6 +10,7 @@ describe('Player Profile & Tournament Registration Schemas', () => {
       profileImageUrl: 'https://example.com/avatar.jpg',
       cricketRole: 'BATSMAN',
       battingStyle: 'RIGHT_HAND',
+      jerseySize: 'M',
     });
     expect(validProfile.success).toBe(true);
 
@@ -39,6 +40,7 @@ describe('Player Profile & Tournament Registration Schemas', () => {
       profileImageUrl: 'https://example.com/avatar.jpg',
       cricketRole: 'ALL_ROUNDER',
       battingStyle: 'RIGHT_HAND',
+      jerseySize: 'L',
       termsAccepted: true,
     });
     expect(validReg.success).toBe(true);

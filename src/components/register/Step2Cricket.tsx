@@ -102,7 +102,8 @@ export const Step2Cricket: React.FC<Step2Props> = ({ initialData, onNext, onBack
           {/* Batting Style */}
           <div>
             <Select
-              label="Batting Style"
+              label="Batting Style *"
+              required
               value={formData.battingStyle || 'RIGHT_HAND'}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, battingStyle: e.target.value as BattingStyle }))
@@ -163,7 +164,7 @@ export const Step2Cricket: React.FC<Step2Props> = ({ initialData, onNext, onBack
           {/* Jersey Size */}
           <div>
             <Select
-              label="Jersey Size"
+              label="Jersey Size *"
               required
               value={formData.jerseySize || 'M'}
               onChange={(e) =>

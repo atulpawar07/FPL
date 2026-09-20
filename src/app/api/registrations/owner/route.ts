@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
       iconPlayerMobile,
       iconPlayerRole,
       iconPlayerBattingStyle,
+      iconPlayerJerseySize,
       ownerIsPlaying,
       ownerCricketRole,
     } = body;
@@ -269,6 +270,7 @@ export async function POST(req: NextRequest) {
           registered_name_snapshot: `${targetIconName}`,
           registered_role_snapshot: iconPlayerRole || ownerCricketRole || 'BATSMAN',
           registered_batting_style_snapshot: iconPlayerBattingStyle || 'RIGHT_HAND',
+          registered_jersey_size_snapshot: iconPlayerJerseySize || 'M',
           registered_at: new Date().toISOString(),
         })
         .select('id')

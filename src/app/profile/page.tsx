@@ -226,7 +226,8 @@ export default function ProfilePage() {
 
             {/* Batting Style */}
             <Select
-              label="Batting Style"
+              label="Batting Style *"
+              required
               value={battingStyle}
               onChange={(e) => setBattingStyle(e.target.value as BattingStyle)}
               options={[
@@ -237,7 +238,7 @@ export default function ProfilePage() {
 
             {/* Jersey Size */}
             <Select
-              label="Jersey Size"
+              label="Jersey Size *"
               required
               value={jerseySize}
               onChange={(e) => setJerseySize(e.target.value as JerseySize)}

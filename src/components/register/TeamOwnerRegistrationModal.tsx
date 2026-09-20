@@ -40,6 +40,7 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
   const [iconPlayerMobile, setIconPlayerMobile] = useState('');
   const [iconPlayerRole, setIconPlayerRole] = useState('BATSMAN');
   const [iconPlayerBattingStyle, setIconPlayerBattingStyle] = useState('RIGHT_HAND');
+  const [iconPlayerJerseySize, setIconPlayerJerseySize] = useState('M');
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -96,6 +97,7 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
           iconPlayerMobile,
           iconPlayerRole,
           iconPlayerBattingStyle,
+          iconPlayerJerseySize,
         }),
       });
 
@@ -258,17 +260,9 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
             placeholder="e.g. Rohit Sharma"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Icon Player Mobile"
-              type="tel"
-              value={iconPlayerMobile}
-              onChange={(e) => setIconPlayerMobile(e.target.value)}
-              placeholder="9876543210"
-            />
-
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-300 block mb-1">Playing Role</label>
+              <label className="text-xs font-medium text-slate-300 block mb-1">Playing Role *</label>
               <select
                 value={iconPlayerRole}
                 onChange={(e) => setIconPlayerRole(e.target.value)}
@@ -278,6 +272,34 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
                 <option value="BOWLER">Bowler</option>
                 <option value="ALL_ROUNDER">All-Rounder</option>
                 <option value="BATSMAN_WICKETKEEPER">Wicketkeeper-Batsman</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1">Batting Style *</label>
+              <select
+                value={iconPlayerBattingStyle}
+                onChange={(e) => setIconPlayerBattingStyle(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl p-2.5 text-xs focus:ring-1 focus:ring-emerald-500"
+              >
+                <option value="RIGHT_HAND">Right-hand</option>
+                <option value="LEFT_HAND">Left-hand</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1">Jersey Size *</label>
+              <select
+                value={iconPlayerJerseySize}
+                onChange={(e) => setIconPlayerJerseySize(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl p-2.5 text-xs focus:ring-1 focus:ring-emerald-500"
+              >
+                <option value="S">Small (S - 38")</option>
+                <option value="M">Medium (M - 40")</option>
+                <option value="L">Large (L - 42")</option>
+                <option value="XL">X-Large (XL - 44")</option>
+                <option value="XXL">XX-Large (XXL - 46")</option>
+                <option value="3XL">3X-Large (3XL - 48")</option>
               </select>
             </div>
           </div>
