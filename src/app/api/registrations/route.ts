@@ -227,24 +227,41 @@ export async function POST(req: NextRequest) {
         waitlistPosition = (waitlistCount || 0) + 1;
       }
 
-      const { data: newReg, error: regErr } = await supabase
+      const regPayload: any = {
+        tournament_id: tournamentId,
+        player_id: playerId,
+        registration_number: registrationNumber,
+        registration_status: registrationStatus,
+        waitlist_position: waitlistPosition,
+        registered_name_snapshot: fullName,
+        registered_role_snapshot: cricketRole,
+        registered_batting_style_snapshot: battingStyle,
+        registered_jersey_size_snapshot: jerseySize,
+        registered_image_snapshot: profileImageUrl,
+      };
+
+      let { data: newReg, error: regErr } = await supabase
         .from('registrations')
-        .insert({
-          tournament_id: tournamentId,
-          player_id: playerId,
-          registration_number: registrationNumber,
-          registration_status: registrationStatus,
-          waitlist_position: waitlistPosition,
-          registered_name_snapshot: fullName,
-          registered_role_snapshot: cricketRole,
-          registered_batting_style_snapshot: battingStyle,
-          registered_jersey_size_snapshot: jerseySize,
-          registered_image_snapshot: profileImageUrl,
-        })
+        .insert(regPayload)
         .select('id')
         .single();
 
-      if (regErr) throw regErr;
+      if (regErr && regErr.message?.includes('column')) {
+        delete regPayload.registered_jersey_size_snapshot;
+        delete regPayload.registered_batting_style_snapshot;
+        regPayload.registered_role_snapshot = regPayload.registered_role_snapshot || 'BATSMAN';
+        regPayload.registered_image_snapshot = regPayload.registered_image_snapshot || profileImageUrl || '/logo.png';
+
+        const retryRes = await supabase
+          .from('registrations')
+          .insert(regPayload)
+          .select('id')
+          .single();
+        newReg = retryRes.data;
+        regErr = retryRes.error;
+      }
+
+      if (regErr || !newReg) throw regErr || new Error('Failed to insert registration');
       registrationId = newReg.id;
     }
 

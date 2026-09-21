@@ -10,9 +10,9 @@ export const Footer: React.FC = () => {
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-500/40 bg-slate-900 shrink-0">
-              <img src="/logo.png" alt="FairPlay Premier League Logo" className="w-full h-full object-cover" />
+              <img src="/logo.png" alt="FPL Premier League Logo" className="w-full h-full object-cover" />
             </div>
-            <span className="font-bold text-lg text-white">FairPlay Premier League</span>
+            <span className="font-bold text-lg text-white">FPL Premier League</span>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed">
             The official portal for player registration, verified payments, squad management, and tournament updates.
@@ -52,16 +52,27 @@ export const Footer: React.FC = () => {
           <h4 className="font-semibold text-slate-200 mb-3 text-sm">Tournament Desk</h4>
           <ul className="space-y-2 text-xs">
             <li className="flex items-center gap-2">
-              <Phone className="w-4 h-4 text-emerald-400" />
-              <span>+91 98765 43210</span>
+              <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
+              <a href="tel:+918652526186" className="hover:text-emerald-400 transition-colors">
+                +91 86525 26186
+              </a>
             </li>
             <li className="flex items-center gap-2">
-              <Mail className="w-4 h-4 text-emerald-400" />
-              <span>support@cricketchampionship.org</span>
+              <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
+              <a href="mailto:support@cricketchampionship.org" className="hover:text-emerald-400 transition-colors">
+                support@cricketchampionship.org
+              </a>
             </li>
             <li className="flex items-start gap-2">
               <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <span>Central Cricket Ground Complex, Sports City</span>
+              <a
+                href="https://share.google/jhDr1oV9hKexMdG3Q"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400 hover:underline font-semibold flex items-center gap-1"
+              >
+                Turf Titans 📍
+              </a>
             </li>
           </ul>
         </div>
@@ -76,7 +87,7 @@ export const Footer: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto mt-8 pt-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-        <p>© 2026 FairPlay Premier League. All rights reserved.</p>
+        <p>© 2026 FPL Premier League. All rights reserved.</p>
         <div className="flex items-center gap-6">
           <span className="hover:text-slate-400 cursor-pointer">Terms & Conditions</span>
           <span className="hover:text-slate-400 cursor-pointer">Privacy Policy</span>

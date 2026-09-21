@@ -14,10 +14,10 @@ export async function POST(
 
     const supabase = createAdminClient();
 
-    // Fetch registration record
+    // Fetch full registration record
     const { data: registration, error: regErr } = await supabase
       .from('registrations')
-      .select('id, player_id, tournament_id')
+      .select('id, player_id, tournament_id, registration_type, team_owner_id, registration_status')
       .eq('id', registrationId)
       .maybeSingle();
 
@@ -28,15 +28,8 @@ export async function POST(
     const newStatus = action === 'REJECT' ? 'CANCELLED' : 'CONFIRMED';
     const newPaymentStatus = action === 'REJECT' ? 'FAILED' : 'SUCCESSFUL';
 
-    // Fetch full registration detail to check team_owner_id
-    const { data: fullReg } = await supabase
-      .from('registrations')
-      .select('id, team_owner_id, registration_type')
-      .eq('id', registrationId)
-      .maybeSingle();
-
-    // Update registration status (both status and registration_status for full compatibility)
-    const { error: updateRegErr } = await supabase
+    // Update the target registration status
+    let { error: updateRegErr } = await supabase
       .from('registrations')
       .update({
         status: newStatus,
@@ -45,24 +38,79 @@ export async function POST(
       })
       .eq('id', registrationId);
 
-    if (updateRegErr) {
-      return NextResponse.json({ error: updateRegErr.message || 'Failed to update registration status' }, { status: 500 });
+    // Fallback: if 'status' column doesn't exist
+    if (updateRegErr && updateRegErr.message?.includes('column')) {
+      const fallback = await supabase
+        .from('registrations')
+        .update({
+          registration_status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', registrationId);
+      updateRegErr = fallback.error;
     }
 
-    // Mapped update to associated team_owners table if linked
-    if (fullReg?.team_owner_id) {
+    if (updateRegErr) {
+      return NextResponse.json({
+        error: updateRegErr.message || 'Failed to update registration status',
+      }, { status: 500 });
+    }
+
+    // ─── CASCADE: If this is an OWNER registration, also update the linked ICON registration ───
+    if (registration.team_owner_id) {
+      // Update team_owners table status
       const ownerStatus = newStatus === 'CONFIRMED' ? 'APPROVED' : 'REJECTED';
       await supabase
         .from('team_owners')
         .update({
           status: ownerStatus,
           payment_status: newPaymentStatus,
-          updated_at: new Date().toISOString(),
         })
-        .eq('id', fullReg.team_owner_id);
+        .eq('id', registration.team_owner_id);
+
+      // Find and update ALL sibling registrations linked to the same team_owner_id
+      // This covers both OWNER→ICON and ICON→OWNER cascading
+      const { data: siblingRegs } = await supabase
+        .from('registrations')
+        .select('id, registration_type')
+        .eq('team_owner_id', registration.team_owner_id)
+        .neq('id', registrationId);
+
+      if (siblingRegs && siblingRegs.length > 0) {
+        const siblingIds = siblingRegs.map((r) => r.id);
+        await supabase
+          .from('registrations')
+          .update({
+            status: newStatus,
+            registration_status: newStatus,
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', siblingIds);
+
+        // Update payments for sibling registrations too
+        for (const sibId of siblingIds) {
+          const { data: sibPayment } = await supabase
+            .from('payments')
+            .select('id')
+            .eq('registration_id', sibId)
+            .maybeSingle();
+
+          if (sibPayment) {
+            await supabase
+              .from('payments')
+              .update({
+                payment_status: newPaymentStatus,
+                verified_by: user.email,
+                verified_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sibPayment.id);
+          }
+        }
+      }
     }
 
-    // Upsert payment record
+    // Upsert payment record for the primary registration
     const { data: existingPayment } = await supabase
       .from('payments')
       .select('id')
@@ -96,9 +144,14 @@ export async function POST(
       });
     }
 
+    const registrationType = registration.registration_type || 'PLAYER';
+    const cascadeMsg = registration.team_owner_id
+      ? ` (cascaded to linked Owner/Icon registrations)`
+      : '';
+
     return NextResponse.json({
       success: true,
-      message: `Player registration ${action.toLowerCase()}d successfully!`,
+      message: `${registrationType} registration ${action.toLowerCase()}d successfully!${cascadeMsg}`,
       registrationId,
       status: newStatus,
     });

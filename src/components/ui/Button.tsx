@@ -3,7 +3,7 @@ import { clsx } from 'clsx';
 import { Loader2 } from 'lucide-react';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'gold' | 'secondary' | 'outline' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
@@ -31,11 +31,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary:
-        'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-950/40 border border-emerald-500/30',
+        'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-lg shadow-emerald-950/60 border border-emerald-400/40 hover:shadow-emerald-500/25',
+      gold:
+        'bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 text-slate-950 font-bold shadow-lg shadow-amber-950/60 border border-amber-300/60 hover:shadow-amber-500/30',
       secondary:
-        'bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 shadow-md',
+        'bg-slate-800/90 hover:bg-slate-700/90 text-slate-100 border border-slate-700 shadow-md backdrop-blur-sm',
       outline:
-        'bg-transparent hover:bg-slate-800/60 text-emerald-400 border border-emerald-500/40 hover:border-emerald-400',
+        'bg-slate-900/40 hover:bg-slate-800/60 text-emerald-400 border border-emerald-500/40 hover:border-emerald-400 backdrop-blur-sm',
       ghost: 'bg-transparent hover:bg-slate-800/50 text-slate-300 hover:text-white',
       danger:
         'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-950/40 border border-rose-500/30',

@@ -168,15 +168,15 @@ function HomePageContent() {
                     return (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Link href={`/tournament/${activeTournament.id}`} className="w-full">
-                          <Button size="lg" className="w-full" leftIcon={<UserCheck className="w-5 h-5" />}>
+                          <Button size="lg" className="w-full shadow-lg shadow-emerald-950/60" leftIcon={<UserCheck className="w-5 h-5" />}>
                             Register as Player ({feeDisplay})
                           </Button>
                         </Link>
 
                         {activeTournament.tournament_type === 'OWNER_BASED' && (
                           <Link href={`/tournament/${activeTournament.id}?type=owner`} className="w-full">
-                            <Button size="lg" variant="secondary" className="w-full border-amber-500/40 text-amber-300 hover:bg-amber-950/50" leftIcon={<Trophy className="w-5 h-5 text-amber-400" />}>
-                              Register as Team Owner
+                            <Button size="lg" variant="gold" className="w-full" leftIcon={<Trophy className="w-5 h-5" />}>
+                              Register as Team Owner 👑
                             </Button>
                           </Link>
                         )}
@@ -249,15 +249,15 @@ function HomePageContent() {
                     return (
                       <div className="flex flex-wrap items-center gap-3">
                         <Link href={`/tournament/${activeTournament.id}`}>
-                          <Button size="lg" leftIcon={<UserCheck className="w-5 h-5" />}>
+                          <Button size="lg" className="shadow-lg shadow-emerald-950/60" leftIcon={<UserCheck className="w-5 h-5" />}>
                             Register as Player ({feeDisplay})
                           </Button>
                         </Link>
 
                         {activeTournament.tournament_type === 'OWNER_BASED' && (
                           <Link href={`/tournament/${activeTournament.id}?type=owner`}>
-                            <Button size="lg" variant="secondary" className="border-amber-500/40 text-amber-300 hover:bg-amber-950/50" leftIcon={<Trophy className="w-5 h-5 text-amber-400" />}>
-                              Register as Team Owner
+                            <Button size="lg" variant="gold" leftIcon={<Trophy className="w-5 h-5" />}>
+                              Register as Team Owner 👑
                             </Button>
                           </Link>
                         )}
@@ -619,25 +619,34 @@ function HomePageContent() {
         <section id="contact" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 scroll-mt-24">
           <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="space-y-3 text-center md:text-left">
-              <h2 className="text-xl sm:text-2xl font-bold text-white">Have Questions or Need Help?</h2>
-              <p className="text-xs sm:text-sm text-slate-400 max-w-xl">
-                Our tournament helpdesk is available to assist you with registration queries, role choices, and receipt access.
+              <h2 className="text-xl sm:text-2xl font-bold text-white">Have Questions or Need Venue Details?</h2>
+              <p className="text-xs sm:text-sm text-slate-400 max-w-xl flex items-center justify-center md:justify-start gap-2">
+                <span>Official Venue:</span>
+                <a
+                  href="https://share.google/jhDr1oV9hKexMdG3Q"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 hover:underline font-bold inline-flex items-center gap-1"
+                >
+                  Turf Titans 📍
+                </a>
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4 shrink-0">
               <a
-                href={`mailto:${activeTournament?.contact_email || 'support@cricketchampionship.org'}`}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs sm:text-sm border border-slate-700 transition-colors"
+                href="https://share.google/jhDr1oV9hKexMdG3Q"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 font-semibold rounded-xl text-xs sm:text-sm border border-emerald-500/40 transition-colors shadow-lg"
               >
-                <Mail className="w-4 h-4 text-emerald-400" />
-                <span>Email Helpdesk</span>
+                <span>📍 Turf Titans Location</span>
               </a>
               <a
-                href={`tel:${activeTournament?.contact_phone || '+919876543210'}`}
+                href={`tel:${activeTournament?.contact_phone || '+918652526186'}`}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs sm:text-sm border border-slate-700 transition-colors"
               >
                 <Phone className="w-4 h-4 text-emerald-400" />
-                <span>Call Helpdesk</span>
+                <span>+91 86525 26186</span>
               </a>
             </div>
           </div>

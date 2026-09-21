@@ -22,40 +22,68 @@ export async function GET(
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 });
     }
 
-    // 2. Fetch registrations for this tournament
-    const { data: registrations, error: regErr } = await supabase
-      .from('registrations')
-      .select(`
-        id,
-        tournament_id,
-        player_id,
-        registration_number,
-        status,
-        registration_status,
-        registration_type,
-        team_name,
-        team_owner_id,
-        waitlist_position,
-        registered_name_snapshot,
-        registered_role_snapshot,
-        registered_batting_style_snapshot,
-        registered_jersey_size_snapshot,
-        registered_image_snapshot,
-        registered_at,
-        players (
+    // 2. Fetch registrations for this tournament — try full query, fallback for missing columns
+    let registrations: any[] = [];
+    {
+      const { data: regData, error: regErr } = await supabase
+        .from('registrations')
+        .select(`
           id,
-          full_name,
-          email,
-          profile_image_url
-        )
-      `)
-      .eq('tournament_id', tournamentId)
-      .order('registered_at', { ascending: true });
+          tournament_id,
+          player_id,
+          registration_number,
+          status,
+          registration_status,
+          registration_type,
+          team_name,
+          team_owner_id,
+          waitlist_position,
+          registered_name_snapshot,
+          registered_role_snapshot,
+          registered_batting_style_snapshot,
+          registered_jersey_size_snapshot,
+          registered_image_snapshot,
+          registered_at,
+          players (
+            id,
+            full_name,
+            email,
+            profile_image_url
+          )
+        `)
+        .eq('tournament_id', tournamentId)
+        .order('registered_at', { ascending: true });
 
-    if (regErr) throw regErr;
+      if (regErr) {
+        console.warn('Full registration query failed, trying fallback:', regErr.message);
+        const { data: fbData } = await supabase
+          .from('registrations')
+          .select(`
+            id,
+            tournament_id,
+            player_id,
+            registration_number,
+            registration_status,
+            waitlist_position,
+            registered_name_snapshot,
+            registered_role_snapshot,
+            registered_at
+          `)
+          .eq('tournament_id', tournamentId)
+          .order('registered_at', { ascending: true });
+        registrations = (fbData || []).map((r: any) => ({
+          ...r,
+          status: r.registration_status,
+          registration_type: 'PLAYER',
+          registered_image_snapshot: '/logo.png',
+        }));
+      } else {
+        registrations = regData || [];
+      }
+    }
 
     // 3. Fetch payments for registrations in this tournament
-    const regIds = (registrations || []).map((r) => r.id);
+    const regIds = registrations.map((r: any) => r.id);
     let payments: any[] = [];
     if (regIds.length > 0) {
       const { data: pData } = await supabase
@@ -77,8 +105,8 @@ export async function GET(
     }
 
     // Combine registrations with payments
-    const enrichedRegistrations = (registrations || []).map((r) => {
-      const payment = payments.find((p) => p.registration_id === r.id) || null;
+    const enrichedRegistrations = registrations.map((r: any) => {
+      const payment = payments.find((p: any) => p.registration_id === r.id) || null;
       const effectiveStatus = r.status || r.registration_status || 'PENDING';
       return {
         ...r,
@@ -89,17 +117,19 @@ export async function GET(
     });
 
     const isConfirmedReg = (r: any) => r.status === 'CONFIRMED' || r.registration_status === 'CONFIRMED';
-    const isWaitlistReg = (r: any) => r.status === 'WAITING_LIST' || r.registration_status === 'WAITING_LIST' || r.status === 'PENDING';
+    const isPendingReg = (r: any) => r.status === 'PENDING' || r.registration_status === 'PENDING';
+    const isWaitlistReg = (r: any) => r.status === 'WAITING_LIST' || r.registration_status === 'WAITING_LIST';
 
     // ALL types count toward player capacity (Owner is a player too)
-    const confirmedPlayersCount = enrichedRegistrations.filter((r) => isConfirmedReg(r)).length;
-    const waitlistCount = enrichedRegistrations.filter((r) => isWaitlistReg(r)).length;
-    const ownerRegistrationsCount = enrichedRegistrations.filter((r) => r.registration_type === 'OWNER').length;
-    const iconRegistrationsCount = enrichedRegistrations.filter((r) => r.registration_type === 'ICON').length;
-    const standardPlayersCount = enrichedRegistrations.filter((r) => r.registration_type === 'PLAYER' || !r.registration_type).length;
+    const confirmedPlayersCount = enrichedRegistrations.filter(isConfirmedReg).length;
+    const pendingCount = enrichedRegistrations.filter(isPendingReg).length;
+    const waitlistCount = enrichedRegistrations.filter(isWaitlistReg).length;
+    const ownerRegistrationsCount = enrichedRegistrations.filter((r: any) => r.registration_type === 'OWNER').length;
+    const iconRegistrationsCount = enrichedRegistrations.filter((r: any) => r.registration_type === 'ICON').length;
+    const standardPlayersCount = enrichedRegistrations.filter((r: any) => r.registration_type === 'PLAYER' || !r.registration_type).length;
 
-    const successfulPayments = payments.filter((p) => p.payment_status === 'SUCCESSFUL').length;
-    const pendingPayments = payments.filter((p) => p.payment_status === 'PENDING').length;
+    const successfulPayments = payments.filter((p: any) => p.payment_status === 'SUCCESSFUL').length;
+    const pendingPayments = payments.filter((p: any) => p.payment_status === 'PENDING').length;
 
     const maxTeams = tournament.max_teams || 8;
 
@@ -112,6 +142,7 @@ export async function GET(
       stats: {
         totalRegistered: enrichedRegistrations.length,
         confirmedCount: confirmedPlayersCount,
+        pendingCount,
         waitlistCount,
         availableSlots: Math.max(0, tournament.max_players - confirmedPlayersCount),
         ownerRegistrationsCount,

@@ -24,12 +24,12 @@ export async function GET(
     // Owner IS a player — Owner + Icon consume 2 player slots each
     const { data: allRegistrations } = await supabase
       .from('registrations')
-      .select('id, status, registration_status, registration_type')
+      .select('id, registration_status, registration_type')
       .eq('tournament_id', id);
 
     const activeRegs = allRegistrations || [];
-    const isConfirmed = (r: any) => r.status === 'CONFIRMED' || r.registration_status === 'CONFIRMED';
-    const isWaitlist = (r: any) => r.status === 'WAITING_LIST' || r.registration_status === 'WAITING_LIST' || r.status === 'PENDING';
+    const isConfirmed = (r: any) => r.registration_status === 'CONFIRMED';
+    const isWaitlist = (r: any) => r.registration_status === 'WAITING_LIST' || r.registration_status === 'PENDING';
 
     // ALL types count toward player capacity (Owner is a player too)
     const confirmedPlayerCount = activeRegs.filter(r => isConfirmed(r)).length;
@@ -50,7 +50,6 @@ export async function GET(
         team_name,
         team_owner_id,
         registered_at,
-        status,
         registration_status,
         player:players (
           email,

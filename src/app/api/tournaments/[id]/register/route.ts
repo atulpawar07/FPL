@@ -125,7 +125,7 @@ export async function POST(
       .from('registrations')
       .select('id', { count: 'exact', head: true })
       .eq('tournament_id', tournamentId)
-      .or('status.eq.CONFIRMED,registration_status.eq.CONFIRMED');
+      .eq('registration_status', 'CONFIRMED');
 
     const maxCapacity = tournament.max_players;
     const isRegularSlotAvailable = (confirmedCount || 0) < maxCapacity;
@@ -172,6 +172,7 @@ export async function POST(
       delete regPayload.registered_jersey_size_snapshot;
       delete regPayload.registered_batting_style_snapshot;
       delete regPayload.registration_type;
+      delete regPayload.status;
 
       const fallbackRegRes = await supabaseAdmin
         .from('registrations')

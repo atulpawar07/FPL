@@ -63,13 +63,25 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', dbPayment.id);
 
-    await supabase
+    let { error: regUpdateErr } = await supabase
       .from('registrations')
       .update({
         status: 'CONFIRMED',
+        registration_status: 'CONFIRMED',
         updated_at: paidAt,
       })
       .eq('id', dbPayment.registration_id);
+
+    // Fallback: if 'status' column doesn't exist, retry with only registration_status
+    if (regUpdateErr && regUpdateErr.message?.includes('column')) {
+      await supabase
+        .from('registrations')
+        .update({
+          registration_status: 'CONFIRMED',
+          updated_at: paidAt,
+        })
+        .eq('id', dbPayment.registration_id);
+    }
 
     return NextResponse.json({
       success: true,
