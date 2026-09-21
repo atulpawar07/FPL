@@ -146,9 +146,9 @@ export const PrintableReceipt: React.FC<PrintableReceiptProps> = ({ profile }) =
         {/* Footer Authorization Stamp */}
         <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
           <div>
-            <p className="font-semibold text-slate-300">Organized by Premier Cricket Committee</p>
+            <p className="font-semibold text-slate-300">Organized by FairPlay Premier League (FPL)</p>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Contact: {tournament.contact_email || 'support@cricketchampionship.org'}
+              Contact: {tournament.contact_phone || '+91 86525 26186'}
             </p>
           </div>
         </div>

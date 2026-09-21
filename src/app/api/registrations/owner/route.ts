@@ -268,14 +268,6 @@ export async function POST(req: NextRequest) {
       ownerInsertErr = fb.error;
     }
 
-    // Fallback: if FK constraint on player_id fails
-    if (ownerInsertErr && ownerInsertErr.message?.includes('foreign key')) {
-      ownerPayload.player_id = null;
-      const fkFb = await supabase.from('team_owners').insert(ownerPayload).select().single();
-      newOwner = fkFb.data;
-      ownerInsertErr = fkFb.error;
-    }
-
     if (ownerInsertErr || !newOwner) {
       console.error('Team Owner insert error:', ownerInsertErr);
       return NextResponse.json({

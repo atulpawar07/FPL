@@ -9,12 +9,12 @@ import { Settings, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 export default function AdminSettingsPage() {
   const [formData, setFormData] = useState({
     id: '',
-    name: 'Premier Cricket Championship 2026',
+    name: 'FPL Premier League',
     registrationFeeRupees: 500,
     maxRegistrations: 500,
-    contactEmail: 'support@cricketchampionship.org',
-    contactPhone: '+91 98765 43210',
-    termsAndConditions: 'By registering, players agree to abide by all MCC & Tournament rules.',
+    contactEmail: '',
+    contactPhone: '+91 86525 26186',
+    termsAndConditions: 'By registering, players agree to abide by all FPL rules.',
   });
 
   const [loading, setLoading] = useState(false);
@@ -28,11 +28,11 @@ export default function AdminSettingsPage() {
         if (!data.error) {
           setFormData({
             id: data.id || '',
-            name: data.name || 'Premier Cricket Championship 2026',
+            name: data.name || 'FPL Premier League',
             registrationFeeRupees: data.registration_fee ? data.registration_fee / 100 : 500,
             maxRegistrations: data.max_players || data.max_registrations || 500,
-            contactEmail: data.contact_email || 'support@cricketchampionship.org',
-            contactPhone: data.contact_phone || '+91 98765 43210',
+            contactEmail: data.contact_email || '',
+            contactPhone: data.contact_phone || '+91 86525 26186',
             termsAndConditions: data.terms_and_conditions || 'By registering, players agree to abide by rules.',
           });
         }
