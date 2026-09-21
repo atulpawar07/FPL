@@ -323,12 +323,16 @@ export async function POST(req: NextRequest) {
         console.error('Owner registration insert failed completely:', ownerRegErr.message);
       } else {
         ownerRegistrationId = ownerRegData?.id || null;
-        // Create payment record for owner
+        // Create payment record for owner with total clubbed fee (Owner Fee + Player Fee)
         if (ownerRegistrationId && paymentScreenshotUrl) {
           try {
+            const ownerFeePaise = tournament.owner_registration_fee || 900000;
+            const playerFeePaise = tournament.registration_fee || 90000;
+            const totalClubbedFeePaise = body.clubbedAmountPaise || (ownerFeePaise + playerFeePaise);
+
             await supabase.from('payments').insert({
               registration_id: ownerRegistrationId,
-              amount: tournament.owner_registration_fee || 250000,
+              amount: totalClubbedFeePaise,
               payment_method: 'UPI_QR',
               payment_status: 'PENDING',
               payment_screenshot_url: paymentScreenshotUrl,
