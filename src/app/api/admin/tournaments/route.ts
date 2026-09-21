@@ -92,20 +92,47 @@ export async function POST(req: NextRequest) {
 
     let result;
     if (id) {
-      const { data: updated, error } = await supabaseAdmin
+      let { data: updated, error } = await supabaseAdmin
         .from('tournaments')
         .update(tournamentData)
         .eq('id', id)
         .select('*')
         .single();
+
+      // Fallback: strip columns that may not exist in remote DB schema cache
+      if (error && error.message?.includes('column')) {
+        delete (tournamentData as any).icon_player_enabled;
+        delete (tournamentData as any).owner_is_playing_enabled;
+        const fallback = await supabaseAdmin
+          .from('tournaments')
+          .update(tournamentData)
+          .eq('id', id)
+          .select('*')
+          .single();
+        updated = fallback.data;
+        error = fallback.error;
+      }
       if (error) throw error;
       result = updated;
     } else {
-      const { data: created, error } = await supabaseAdmin
+      let { data: created, error } = await supabaseAdmin
         .from('tournaments')
         .insert(tournamentData)
         .select('*')
         .single();
+
+      // Fallback: strip columns that may not exist in remote DB schema cache
+      if (error && error.message?.includes('column')) {
+        delete (tournamentData as any).icon_player_enabled;
+        delete (tournamentData as any).owner_is_playing_enabled;
+        const fallback = await supabaseAdmin
+          .from('tournaments')
+          .insert(tournamentData)
+          .select('*')
+          .single();
+        created = fallback.data;
+        error = fallback.error;
+      }
       if (error) throw error;
       result = created;
     }
