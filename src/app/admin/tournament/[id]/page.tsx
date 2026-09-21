@@ -24,6 +24,7 @@ import {
   Search,
   Loader2,
   Eye,
+  Trash2,
 } from 'lucide-react';
 
 export default function SingleTournamentAdminPage({ params }: { params: Promise<{ id: string }> }) {
@@ -85,6 +86,54 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
       }
     } catch (err) {
       setActionMessage('Network error updating registration');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDeleteRegistration = async (regId: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete registration for "${name}"? This will permanently remove the entry.`)) {
+      return;
+    }
+    setActionLoadingId(regId);
+    setActionMessage(null);
+    try {
+      const res = await fetch(`/api/admin/registrations/${regId}`, {
+        method: 'DELETE',
+      });
+      const resData = await res.json();
+      if (res.ok) {
+        setActionMessage(resData.message || 'Registration deleted successfully!');
+        fetchSummary();
+      } else {
+        setActionMessage(`Error: ${resData.error || 'Failed to delete registration'}`);
+      }
+    } catch (err) {
+      setActionMessage('Network error deleting registration');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDeleteOwner = async (ownerId: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete Team Owner "${name}" and all associated squad entries? This action cannot be undone.`)) {
+      return;
+    }
+    setActionLoadingId(ownerId);
+    setActionMessage(null);
+    try {
+      const res = await fetch(`/api/admin/team-owners/${ownerId}`, {
+        method: 'DELETE',
+      });
+      const resData = await res.json();
+      if (res.ok) {
+        setActionMessage(resData.message || 'Team Owner entry deleted successfully!');
+        fetchSummary();
+      } else {
+        setActionMessage(`Error: ${resData.error || 'Failed to delete team owner'}`);
+      }
+    } catch (err) {
+      setActionMessage('Network error deleting team owner');
     } finally {
       setActionLoadingId(null);
     }
@@ -325,6 +374,7 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
                     <th className="p-3">Waitlist Pos</th>
                     <th className="p-3">Payment</th>
                     <th className="p-3">Date</th>
+                    <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
@@ -375,6 +425,17 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
                         </Badge>
                       </td>
                       <td className="p-3 text-slate-400">{formatDate(r.registered_at)}</td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => handleDeleteRegistration(r.id, r.registered_name_snapshot || 'Player')}
+                          disabled={actionLoadingId === r.id}
+                          className="px-2.5 py-1 bg-rose-950/80 border border-rose-500/40 text-rose-300 hover:bg-rose-900 font-semibold text-[11px] rounded-lg transition-colors inline-flex items-center gap-1"
+                          title="Delete Registration Entry"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -508,6 +569,17 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
                         ⭐ Icon Player: {o.icon_player_name} ({o.icon_player_role || 'Batsman'})
                       </p>
                     )}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800 flex justify-end">
+                    <button
+                      onClick={() => handleDeleteOwner(o.id, o.owner_name || o.team_name || 'Team Owner')}
+                      disabled={actionLoadingId === o.id}
+                      className="px-3 py-1.5 bg-rose-950/80 border border-rose-500/40 text-rose-300 hover:bg-rose-900 font-semibold text-xs rounded-xl transition-colors inline-flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Owner Entry</span>
+                    </button>
                   </div>
                 </div>
               ))}

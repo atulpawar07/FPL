@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { formatPaiseToINR, formatDate, cricketRoleLabels } from '@/lib/utils/format';
-import { Search, Download, Eye, CheckCircle2, ShieldCheck, Trophy, History, User } from 'lucide-react';
+import { Search, Download, Eye, CheckCircle2, ShieldCheck, Trophy, History, User, Trash2 } from 'lucide-react';
 
 export default function AdminPlayersPage() {
   const [players, setPlayers] = useState<any[]>([]);
@@ -64,6 +64,25 @@ export default function AdminPlayersPage() {
   useEffect(() => {
     fetchPlayers();
   }, [search, roleFilter, statusFilter, paymentStatusFilter, tournamentFilter]);
+
+  const handleDeletePlayerRegistration = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete registration entry for "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/registrations/${id}`, {
+        method: 'DELETE',
+      });
+      const resData = await res.json();
+      if (res.ok) {
+        fetchPlayers();
+      } else {
+        alert(resData.error || 'Failed to delete entry');
+      }
+    } catch (err) {
+      alert('Network error deleting entry');
+    }
+  };
 
   const handleOpenPaymentModal = (playerItem: any) => {
     setSelectedPlayerForPayment(playerItem);
@@ -393,6 +412,14 @@ export default function AdminPlayersPage() {
                             Pass
                           </Button>
                         </Link>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDeletePlayerRegistration(item.id, item.registered_name_snapshot || item.player?.full_name || 'Player')}
+                          leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                        >
+                          Delete
+                        </Button>
                       </td>
                     </tr>
                   );
