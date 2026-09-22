@@ -368,205 +368,42 @@ function HomePageContent() {
           )}
         </section>
 
-        {/* HOW IT WORKS SECTION */}
-        <section id="how-it-works" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 scroll-mt-24">
-          <div className="text-center space-y-3 max-w-2xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-              Registration Journey
-            </span>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white">
-              How to Complete Your Registration
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
-              Get registered in 4 simple mobile-friendly steps.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Step 1 */}
-            <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-6 space-y-4 hover:border-emerald-500/50 transition-all group">
-              <div className="w-12 h-12 rounded-xl bg-slate-800 text-emerald-400 font-bold text-lg flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                1
-              </div>
-              <h3 className="font-bold text-slate-100 text-base">Personal Details</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Enter your full name, 10-digit mobile number, email, DOB, city, and optional profile photo.
-              </p>
-            </div>
-
-            {/* Step 2 */}
-            <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-6 space-y-4 hover:border-emerald-500/50 transition-all group">
-              <div className="w-12 h-12 rounded-xl bg-slate-800 text-emerald-400 font-bold text-lg flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                2
-              </div>
-              <h3 className="font-bold text-slate-100 text-base">Cricket Skills</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Select your primary playing role (Batsman, Bowler, All-rounder), batting style, and bowling preference.
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-6 space-y-4 hover:border-emerald-500/50 transition-all group">
-              <div className="w-12 h-12 rounded-xl bg-slate-800 text-emerald-400 font-bold text-lg flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                3
-              </div>
-              <h3 className="font-bold text-slate-100 text-base">Review & Fee</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Review your entry details, verify the registration fee ({feeDisplay}), and accept the tournament code of conduct.
-              </p>
-            </div>
-
-            {/* Step 4 */}
-            <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-6 space-y-4 hover:border-emerald-500/50 transition-all group">
-              <div className="w-12 h-12 rounded-xl bg-slate-800 text-emerald-400 font-bold text-lg flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                4
-              </div>
-              <h3 className="font-bold text-slate-100 text-base">Instant Pass</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Receive your non-sequential Reference ID (`REG-2026-XXXXX`) and printable official receipt.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* ABOUT FAIRPLAY PREMIER LEAGUE (FPL) & CODE OF CONDUCT SECTION */}
-        <section id="about-fpl" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 scroll-mt-24">
-          {/* Mission Banner Card */}
-          <div className="bg-gradient-to-br from-slate-900 via-emerald-950/40 to-slate-950 border border-emerald-500/30 rounded-3xl p-6 sm:p-10 space-y-6 shadow-2xl relative overflow-hidden">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-xs font-bold uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                  Official Platform Mission
-                </div>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white">
-                  About FairPlay Premier League (FPL)
-                </h2>
-              </div>
-            </div>
-
-            <p className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-5xl">
-              FairPlay Premier League (FPL) is a platform which has been formed to enhance the game of cricket with those cricket enthusiasts who never got an opportunity or a platform to discover their skills and achieve their dreams. In Fairplay Premier League (FPL) we practice being sincere towards maintaining the integrity of the game by rendering <strong className="text-emerald-300">RESPECT</strong> towards all participants and League officials involved.
-            </p>
-
-            {/* 5 Basic Principles Grid */}
-            <div className="space-y-4 pt-4 border-t border-slate-800">
-              <h3 className="text-sm font-extrabold text-amber-300 uppercase tracking-wider flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-amber-400" />
-                Five Basic Principles of FairPlay Premier League
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                {[
-                  "1. Respect the rules of the League.",
-                  "2. Respect the opponents.",
-                  "3. Respect the League officials and their decisions.",
-                  "4. Have everyone participate.",
-                  "5. Always maintain self-control.",
-                ].map((principle, idx) => (
-                  <div key={idx} className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 text-xs font-semibold text-slate-200 flex items-center gap-2 shadow-md">
-                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0 text-[10px] font-bold">✓</span>
-                    <span>{principle.substring(3)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Benefits & Team Selection Criteria */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Benefits of FPL */}
-            <div className="lg:col-span-6 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl">
-              <h3 className="text-lg font-extrabold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-                <Trophy className="w-5 h-5 text-emerald-400" />
-                Benefits of Fairplay Premier League (FPL)
-              </h3>
-              <ul className="space-y-2.5 text-xs sm:text-sm text-slate-300">
-                <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">✓</span> Increased positive team unity.</li>
-                <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">✓</span> More appropriate spectator behaviour.</li>
-                <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">✓</span> Decrease the win-at-all-cost attitude.</li>
-                <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">✓</span> Increase of on-field positive behaviour.</li>
-                <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">✓</span> Participants take more responsibility for their actions.</li>
-                <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">✓</span> Increase in sportsmanship.</li>
-                <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">✓</span> More become promoters of positive attitudes.</li>
-                <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">✓</span> New participants drawn to cricket by positive aspects of FPL.</li>
-              </ul>
-            </div>
-
-            {/* Team Selection Criteria & Program Intercede */}
-            <div className="lg:col-span-6 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl">
-              <h3 className="text-lg font-extrabold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-                <ShieldCheck className="w-5 h-5 text-teal-400" />
-                Team Selection & Auction Standards
-              </h3>
-              <div className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
-                <p>
-                  Procedures for selection of competitive and recreational teams vary with associations. In player selection, <strong>'Ability'</strong> and <strong>'Attitude'</strong> should be criteria. All participants must be made aware of these two criteria prior to selections.
-                </p>
-                <div className="p-3.5 bg-rose-950/40 border border-rose-500/30 rounded-2xl text-rose-200 text-xs font-semibold">
-                  🚫 Players exhibiting poor sportsmanship, lack of honesty, and lack of safety and respect for others should be made aware that attitudes such as these are not tolerated in FPL.
-                </div>
-                <p className="text-slate-400">
-                  Selection criteria in auction for any members should not solely be based upon skill level. Attitude is important. FPL Program Intercede are components introduced into Premier Leagues to enhance Dishonest Practice and Respect towards fellow members and to abide with the principles of FPL.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Code of Conduct Tabs / Cards */}
-          <div className="space-y-6">
-            <div className="text-center space-y-2 max-w-xl mx-auto">
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white">Official Code of Conduct</h2>
-              <p className="text-xs sm:text-sm text-slate-400">Established rules and ethical guidelines for all participants in FPL.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Code for Team Owners & Captains */}
-              <div className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl relative overflow-hidden">
-                <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-                  <div className="w-10 h-10 rounded-xl bg-amber-950 border border-amber-500/40 text-amber-400 flex items-center justify-center font-bold shrink-0">
-                    👑
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-white text-base sm:text-lg">Code for Team Owners & Captains</h3>
-                    <span className="text-xs text-amber-400 font-semibold">FPL Leadership Guidelines</span>
-                  </div>
-                </div>
-
-                <ul className="space-y-2.5 text-xs sm:text-sm text-slate-300">
-                  <li className="flex items-start gap-2.5"><span className="text-amber-400 font-bold">•</span> Reasonable when scheduling games and practices, remembering that players have other obligations.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-amber-400 font-bold">•</span> Guide players to play fairly and to respect the rules, officials, and opponents.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-amber-400 font-bold">•</span> Ensure that all players get equal instruction, support, and opportunities.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-amber-400 font-bold">•</span> Will not ridicule or yell at players for making mistakes or performing poorly.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-amber-400 font-bold">•</span> Remember players play to have fun and must be encouraged to have confidence in themselves.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-amber-400 font-bold">•</span> Be generous with praise and set a good example.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-amber-400 font-bold">•</span> Obtain proper training and continue to upgrade team member skills.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-amber-400 font-bold">•</span> Work in cooperation with officials for the benefit of the game.</li>
-                </ul>
-              </div>
-
-              {/* Code for Players */}
-              <div className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl relative overflow-hidden">
-                <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+        {/* QUICK LINKS TO ABOUT & HOW IT WORKS */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Link href="/how-it-works" className="block group">
+              <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-3 shadow-xl hover:border-emerald-500/50 transition-all">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-emerald-950 border border-emerald-500/40 text-emerald-400 flex items-center justify-center font-bold shrink-0">
-                    🏏
+                    📋
                   </div>
-                  <div>
-                    <h3 className="font-extrabold text-white text-base sm:text-lg">Code for Players</h3>
-                    <span className="text-xs text-emerald-400 font-semibold">FPL Player Ethics</span>
-                  </div>
+                  <h3 className="font-extrabold text-white text-lg">How It Works</h3>
                 </div>
-
-                <ul className="space-y-2.5 text-xs sm:text-sm text-slate-300">
-                  <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">•</span> Play cricket because I want to, not just because Captains and Owners want me to.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">•</span> Play and abide by the rules of cricket during the tournament, and in the spirit of the game.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">•</span> Control my temper – fighting and “mouthing off” can spoil the activity for everybody.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">•</span> Respect my opponents and do my best to be a true team player.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">•</span> Remember that winning isn’t everything. Having fun, improving skills, making friends, and doing my best are also important.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">•</span> Acknowledge all good plays/performances – those of my team and of my opponents.</li>
-                  <li className="flex items-start gap-2.5"><span className="text-emerald-400 font-bold">•</span> Remember that Captains and Owners are there to help me. Accept their decisions and show them respect.</li>
-                </ul>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  Step-by-step guide for completing your player or team owner registration with payment verification.
+                </p>
+                <span className="inline-flex items-center gap-1 text-emerald-400 text-xs font-bold group-hover:gap-2 transition-all">
+                  Learn More <ArrowRight className="w-3.5 h-3.5" />
+                </span>
               </div>
-            </div>
+            </Link>
+
+            <Link href="/about" className="block group">
+              <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-3 shadow-xl hover:border-amber-500/50 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-950 border border-amber-500/40 text-amber-400 flex items-center justify-center font-bold shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-extrabold text-white text-lg">About FPL</h3>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  Learn about FairPlay Premier League&apos;s mission, principles, code of conduct, and benefits.
+                </p>
+                <span className="inline-flex items-center gap-1 text-amber-400 text-xs font-bold group-hover:gap-2 transition-all">
+                  Read More <ArrowRight className="w-3.5 h-3.5" />
+                </span>
+              </div>
+            </Link>
           </div>
         </section>
 

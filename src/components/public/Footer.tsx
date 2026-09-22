@@ -29,13 +29,18 @@ export const Footer: React.FC = () => {
               </Link>
             </li>
             <li>
-              <Link href="/register" className="hover:text-emerald-400 transition-colors">
-                Player Registration
+              <Link href="/about" className="hover:text-emerald-400 transition-colors">
+                About FPL
               </Link>
             </li>
             <li>
-              <Link href="/#tournament-info" className="hover:text-emerald-400 transition-colors">
-                Eligibility & Rules
+              <Link href="/how-it-works" className="hover:text-emerald-400 transition-colors">
+                How It Works
+              </Link>
+            </li>
+            <li>
+              <Link href="/register" className="hover:text-emerald-400 transition-colors">
+                Player Registration
               </Link>
             </li>
             <li>
@@ -50,12 +55,29 @@ export const Footer: React.FC = () => {
         {/* Col 3: Contact Details */}
         <div>
           <h4 className="font-semibold text-slate-200 mb-3 text-sm">Tournament Desk</h4>
-          <ul className="space-y-2 text-xs">
+          <ul className="space-y-2.5 text-xs">
             <li className="flex items-center gap-2">
               <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
-              <a href="tel:+918652526186" className="hover:text-emerald-400 transition-colors">
-                +91 86525 26186
-              </a>
+              <span>
+                Calling:{' '}
+                <a href="tel:+918433832332" className="text-white hover:text-emerald-400 font-semibold transition-colors">
+                  8433832332
+                </a>
+              </span>
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="text-emerald-400 font-bold text-sm shrink-0">💬</span>
+              <span>
+                WhatsApp:{' '}
+                <a
+                  href="https://wa.me/918652526186"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 hover:underline font-semibold"
+                >
+                  8652526186
+                </a>
+              </span>
             </li>
             <li className="flex items-start gap-2">
               <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />

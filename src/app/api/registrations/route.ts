@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
     // 3. Create Registration Record via RPC allocate_registration_slot (or direct fallback)
     let registrationId: string;
     let registrationNumber: string;
-    let registrationStatus: string = 'CONFIRMED';
+    let registrationStatus: string = 'PENDING';
     let waitlistPosition: number | null = null;
 
     const { data: rpcData, error: rpcErr } = await supabase.rpc('allocate_registration_slot', {
@@ -215,7 +215,7 @@ export async function POST(req: NextRequest) {
         .eq('registration_status', 'CONFIRMED');
 
       if ((confirmedCount || 0) < tournament.max_players) {
-        registrationStatus = 'CONFIRMED';
+        registrationStatus = 'PENDING';
         waitlistPosition = null;
       } else {
         registrationStatus = 'WAITING_LIST';

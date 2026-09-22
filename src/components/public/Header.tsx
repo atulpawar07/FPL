@@ -103,7 +103,7 @@ export const Header: React.FC = () => {
             Home
           </Link>
           <Link
-            href="/#about-fpl"
+            href="/about"
             className="text-sm font-medium text-slate-300 hover:text-emerald-400 transition-colors"
           >
             About FPL
@@ -115,7 +115,7 @@ export const Header: React.FC = () => {
             Tournament Details
           </Link>
           <Link
-            href="/#how-it-works"
+            href="/how-it-works"
             className="text-sm font-medium text-slate-300 hover:text-emerald-400 transition-colors"
           >
             How It Works
@@ -229,6 +229,13 @@ export const Header: React.FC = () => {
               Home
             </Link>
             <Link
+              href="/about"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-4 py-2.5 rounded-xl text-slate-200 hover:bg-slate-800 font-medium text-sm transition-colors"
+            >
+              About FPL
+            </Link>
+            <Link
               href="/#tournament-info"
               onClick={() => setMobileMenuOpen(false)}
               className="px-4 py-2.5 rounded-xl text-slate-200 hover:bg-slate-800 font-medium text-sm transition-colors"
@@ -236,7 +243,7 @@ export const Header: React.FC = () => {
               Tournament Details
             </Link>
             <Link
-              href="/#how-it-works"
+              href="/how-it-works"
               onClick={() => setMobileMenuOpen(false)}
               className="px-4 py-2.5 rounded-xl text-slate-200 hover:bg-slate-800 font-medium text-sm transition-colors"
             >
