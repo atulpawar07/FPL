@@ -62,16 +62,16 @@ function HomePageContent() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-white text-sm sm:text-base">
-                    🎉 Payment Screenshot Uploaded & Step 1 Validated!
+                    🎉 Registration Submitted Successfully!
                   </h3>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    Your entry for <strong className="text-emerald-300">{submittedTournamentName}</strong> has passed Step 1 Automated Checks and is now awaiting Step 2 Admin Review.
+                    Your entry for <strong className="text-emerald-300">{submittedTournamentName}</strong> is now <strong className="text-amber-300">PENDING</strong> admin review. You will be confirmed once your payment is verified.
                   </p>
                 </div>
               </div>
               <Link href="#upcoming-tournaments">
                 <Button size="sm" variant="outline">
-                  View Squad Status
+                  Check Registration Status
                 </Button>
               </Link>
             </div>

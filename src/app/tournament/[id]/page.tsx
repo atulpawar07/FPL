@@ -457,106 +457,105 @@ export default function PublicTournamentPage() {
                 )}
               </Card>
 
-              {/* CONFIRMED SQUAD ROSTER SECTION */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                      <Trophy className="w-5 h-5 text-emerald-400" />
-                      <span>Confirmed Tournament Squad ({confirmedPlayers.length})</span>
-                    </h2>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Official squad roster of admin-approved registered players for {tournament.name}.
-                    </p>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-500/30 self-start sm:self-auto">
-                    {confirmedPlayers.length} Confirmed Players
-                  </span>
-                </div>
+              {/* REGISTRATION STATUS SECTION (User's own status only) */}
+              {currentUser && confirmedPlayers.length > 0 && (() => {
+                const myEntry = confirmedPlayers.find(
+                  (p: any) => p.player?.email === currentUser.email
+                );
+                if (!myEntry) return null;
 
-                {confirmedPlayers.length === 0 ? (
-                  <div className="p-8 bg-slate-950/60 border border-slate-800 rounded-2xl text-center space-y-2">
-                    <p className="text-xs text-slate-400">
-                      No players have been approved for this tournament yet. Complete your registration above to get your slot verified!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {confirmedPlayers.map((playerItem) => {
-                      const isCurrentUser = currentUser?.email && playerItem.player?.email === currentUser.email;
+                const isPending = myEntry.registration_status === 'PENDING';
+                const isConfirmedStatus = myEntry.registration_status === 'CONFIRMED';
 
-                      return (
-                        <div
-                          key={playerItem.id}
-                          className={`p-4 rounded-2xl border transition-all space-y-3 ${
-                            isCurrentUser
-                              ? 'bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-950/50'
-                              : 'bg-slate-950/80 border-slate-800'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono text-[11px] font-bold text-emerald-400">
-                              {playerItem.registration_number}
-                            </span>
-                            {playerItem.registration_type === 'OWNER' || playerItem.registration_type === 'TEAM_OWNER' ? (
-                              <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-2 py-0.5 rounded-full border border-amber-500/40">
-                                👑 Team Owner
-                              </span>
-                            ) : playerItem.registration_type === 'ICON' || playerItem.registration_type === 'ICON_PLAYER' ? (
-                              <span className="text-[10px] font-bold text-teal-300 bg-teal-950 px-2 py-0.5 rounded-full border border-teal-500/40">
-                                ⭐ Icon Player
-                              </span>
-                            ) : isCurrentUser ? (
-                              <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/40">
-                                🏏 Your Entry
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800">
-                                🏏 Player
-                              </span>
-                            )}
-                          </div>
+                return (
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl">
+                    <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        isConfirmedStatus
+                          ? 'bg-emerald-950 border border-emerald-500/40 text-emerald-400'
+                          : 'bg-amber-950 border border-amber-500/40 text-amber-400'
+                      }`}>
+                        {isConfirmedStatus ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-white">Your Registration Status</h2>
+                        <p className="text-xs text-slate-400">
+                          {tournament.name}
+                        </p>
+                      </div>
+                    </div>
 
-                          {playerItem.team_name && (
-                            <div className="text-[11px] font-semibold text-amber-300/90 bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-500/20 w-max">
-                              🛡️ {playerItem.team_name}
+                    <div className={`p-4 rounded-2xl border ${
+                      isConfirmedStatus
+                        ? 'bg-emerald-950/40 border-emerald-500/40'
+                        : 'bg-amber-950/40 border-amber-500/40'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {myEntry.registered_image_snapshot ? (
+                            <img
+                              src={myEntry.registered_image_snapshot}
+                              alt="Your Photo"
+                              className={`w-12 h-12 rounded-full object-cover border-2 shrink-0 ${
+                                isConfirmedStatus ? 'border-emerald-500' : 'border-amber-500'
+                              }`}
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">
+                              <Users className="w-6 h-6" />
                             </div>
                           )}
-
-                          <div className="flex items-center gap-3">
-                            {playerItem.registered_image_snapshot ? (
-                              <img
-                                src={playerItem.registered_image_snapshot}
-                                alt="Player Photo"
-                                className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shrink-0"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">
-                                <Users className="w-6 h-6" />
-                              </div>
-                            )}
-                            <div>
-                              <h4 className="font-bold text-white text-sm">
-                                {playerItem.registered_name_snapshot}
-                              </h4>
-                              <span className="text-xs text-emerald-300 font-semibold block">
-                                {cricketRoleLabels[playerItem.registered_role_snapshot as keyof typeof cricketRoleLabels] || playerItem.registered_role_snapshot}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-800/80">
-                            <span className="text-slate-400">Jersey Size:</span>
-                            <span className="font-bold text-amber-400">
-                              {playerItem.registered_jersey_size_snapshot || 'M'}
+                          <div>
+                            <h4 className="font-bold text-white text-sm">{myEntry.registered_name_snapshot}</h4>
+                            <span className="text-xs text-slate-300 font-semibold">
+                              {cricketRoleLabels[myEntry.registered_role_snapshot as keyof typeof cricketRoleLabels] || myEntry.registered_role_snapshot}
                             </span>
                           </div>
                         </div>
-                      );
-                    })}
+
+                        <div className="text-right">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${
+                            isConfirmedStatus
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          }`}>
+                            {isConfirmedStatus ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                            {myEntry.registration_status}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-slate-800/60 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <span className="text-slate-400 block">Ref ID</span>
+                          <span className="font-mono font-bold text-emerald-400">{myEntry.registration_number}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Jersey Size</span>
+                          <span className="font-bold text-amber-400">{myEntry.registered_jersey_size_snapshot || 'M'}</span>
+                        </div>
+                        {myEntry.team_name && (
+                          <div>
+                            <span className="text-slate-400 block">Team</span>
+                            <span className="font-bold text-teal-400">🛡️ {myEntry.team_name}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {isPending && (
+                      <p className="text-xs text-amber-300/80 text-center">
+                        ⏳ Your registration is awaiting admin approval. Once verified, your status will change to <strong>CONFIRMED</strong>.
+                      </p>
+                    )}
+                    {isConfirmedStatus && (
+                      <p className="text-xs text-emerald-300/80 text-center">
+                        ✅ Your registration has been approved! You are confirmed for this tournament.
+                      </p>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
             </>
           )}
         </div>

@@ -59,14 +59,14 @@ export async function GET(
       .eq('tournament_id', id)
       .order('registered_at', { ascending: true });
 
-    const filteredConfirmed = (confirmedPlayers || []).filter(r => isConfirmed(r));
+    const filteredPlayers = confirmedPlayers || [];
 
     return NextResponse.json({
       tournament,
       confirmedCount: confirmedPlayerCount,
       waitlistCount,
       availableSlots: Math.max(0, tournament.max_players - confirmedPlayerCount),
-      confirmedPlayers: filteredConfirmed,
+      confirmedPlayers: filteredPlayers,
     });
 
   } catch (err: any) {
