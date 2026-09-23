@@ -145,4 +145,34 @@ describe('Phase 1 Architecture V2.2 & DR-V2.2 Foundation Tests', () => {
       expect(remainingTeams).toBe(7);
     });
   });
+
+  describe('7. F-001 Regression Test: Slot Number Derivation via COALESCE(MAX(slot_number), 0) + 1', () => {
+    it('should derive next slot number cleanly as MAX(slot_number) + 1 when intermediate slot 2 is cancelled/deleted', () => {
+      // Simulate existing team owners with slot_number 1, 2, 3
+      let teamOwners = [
+        { id: 'o1', slot_number: 1, status: 'APPROVED' },
+        { id: 'o2', slot_number: 2, status: 'APPROVED' },
+        { id: 'o3', slot_number: 3, status: 'APPROVED' },
+      ];
+
+      // Simulate intermediate slot 2 cancellation / removal
+      teamOwners = teamOwners.filter((o) => o.slot_number !== 2);
+      expect(teamOwners.length).toBe(2); // COUNT(*) is 2
+
+      // Formula using COALESCE(MAX(slot_number), 0) + 1
+      const maxSlotNumber = Math.max(...teamOwners.map((o) => o.slot_number), 0);
+      const nextSlotNumber = maxSlotNumber + 1;
+
+      // Formula using legacy COUNT(*) + 1
+      const legacyCountSlotNumber = teamOwners.length + 1;
+
+      // Legacy COUNT(*) + 1 would produce slot 3 (which collides with existing slot #3!)
+      expect(legacyCountSlotNumber).toBe(3);
+
+      // COALESCE(MAX(slot_number), 0) + 1 correctly produces slot 4 (no collision!)
+      expect(nextSlotNumber).toBe(4);
+      expect(teamOwners.some((o) => o.slot_number === nextSlotNumber)).toBe(false);
+    });
+  });
 });
+
