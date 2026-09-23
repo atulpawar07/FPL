@@ -5,6 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { formatPaiseToINR } from '@/lib/utils/format';
+import { compressImageFile } from '@/lib/utils/image';
 import { Crown, Upload, CheckCircle2, ShieldAlert, Image as ImageIcon, UserCheck } from 'lucide-react';
 
 interface TeamOwnerRegistrationModalProps {
@@ -68,15 +69,21 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
   const isIconRequired = Boolean(tournament?.icon_player_enabled);
   const isOwnerPlayingAllowed = tournament?.owner_is_playing_enabled !== false;
 
-  const handleScreenshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setScreenshotUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImageFile(file);
+      if (compressed) {
+        setScreenshotUrl(compressed);
+      }
+    } catch {
+      // Fallback
+      const reader = new FileReader();
+      reader.onloadend = () => setScreenshotUrl(reader.result as string);
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { ADMIN_EMAIL } from './constants';
+import { ADMIN_EMAIL, ADMIN_EMAILS } from './constants';
 
 export async function checkIsManagerOrAdmin() {
   const supabase = await createServerSupabaseClient();
@@ -11,7 +11,7 @@ export async function checkIsManagerOrAdmin() {
   }
 
   const email = user.email.toLowerCase();
-  const isAdmin = email === ADMIN_EMAIL.toLowerCase();
+  const isAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === email);
 
   if (isAdmin) {
     return { isManager: true, isAdmin: true, user, role: 'ADMIN' as const };

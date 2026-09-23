@@ -571,15 +571,40 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
                     )}
                   </div>
 
-                  <div className="pt-2 border-t border-slate-800 flex justify-end">
-                    <button
-                      onClick={() => handleDeleteOwner(o.id, o.owner_name || o.team_name || 'Team Owner')}
-                      disabled={actionLoadingId === o.id}
-                      className="px-3 py-1.5 bg-rose-950/80 border border-rose-500/40 text-rose-300 hover:bg-rose-900 font-semibold text-xs rounded-xl transition-colors inline-flex items-center gap-1.5"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Delete Owner Entry</span>
-                    </button>
+                  <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                    {o.payment_screenshot_url ? (
+                      <button
+                        onClick={() => setPreviewImageUrl(o.payment_screenshot_url)}
+                        className="px-2.5 py-1 bg-sky-950/80 border border-sky-500/40 text-sky-300 hover:bg-sky-900 font-semibold text-xs rounded-xl transition-colors inline-flex items-center gap-1"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-sky-400" />
+                        <span>View Receipt</span>
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-slate-500 italic">No Screenshot</span>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      {o.status !== 'APPROVED' && o.owner_registration_id && (
+                        <button
+                          onClick={() => handleApprovalAction(o.owner_registration_id, 'APPROVE')}
+                          disabled={actionLoadingId === o.owner_registration_id}
+                          className="px-2.5 py-1 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900 font-semibold text-xs rounded-xl transition-colors inline-flex items-center gap-1"
+                        >
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Approve & Mark Paid</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleDeleteOwner(o.id, o.owner_name || o.team_name || 'Team Owner')}
+                        disabled={actionLoadingId === o.id}
+                        className="px-2.5 py-1 bg-rose-950/80 border border-rose-500/40 text-rose-300 hover:bg-rose-900 font-semibold text-xs rounded-xl transition-colors inline-flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

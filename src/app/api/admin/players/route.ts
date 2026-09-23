@@ -29,6 +29,9 @@ export async function GET(req: NextRequest) {
         player_id,
         registration_number,
         registration_status,
+        registration_type,
+        team_name,
+        team_owner_id,
         waitlist_position,
         registered_name_snapshot,
         registered_role_snapshot,
@@ -50,7 +53,11 @@ export async function GET(req: NextRequest) {
           id,
           amount,
           payment_status,
+          payment_screenshot_url,
           transaction_reference,
+          verification_note,
+          verified_by,
+          verified_at,
           created_at
         )
       `
