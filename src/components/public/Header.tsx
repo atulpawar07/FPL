@@ -82,11 +82,11 @@ export const Header: React.FC = () => {
         {/* Logo & Brand */}
         <Link href="/" className="flex items-center gap-3 group focus:outline-none">
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl overflow-hidden border border-amber-500/50 shadow-lg shadow-amber-950/60 group-hover:scale-105 transition-transform bg-slate-900 shrink-0 glow-gold">
-            <img src="/logo.png" alt="FPL Premier League Logo" className="w-full h-full object-cover" />
+            <img src="/logo.png" alt="Fairplay Premier League Logo" className="w-full h-full object-cover" />
           </div>
           <div>
             <span className="font-black text-base md:text-xl tracking-tight text-gradient-gold block leading-tight">
-              FPL PREMIER LEAGUE
+              FAIRPLAY PREMIER LEAGUE (FPL)
             </span>
             <span className="text-[10px] md:text-xs font-semibold text-amber-400/90 tracking-widest uppercase block">
               Official Player Portal

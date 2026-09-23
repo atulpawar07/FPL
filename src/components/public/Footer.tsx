@@ -10,12 +10,12 @@ export const Footer: React.FC = () => {
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-500/40 bg-slate-900 shrink-0">
-              <img src="/logo.png" alt="FPL Premier League Logo" className="w-full h-full object-cover" />
+              <img src="/logo.png" alt="Fairplay Premier League (FPL) Logo" className="w-full h-full object-cover" />
             </div>
-            <span className="font-bold text-lg text-white">FPL Premier League</span>
+            <span className="font-bold text-lg text-white">Fairplay Premier League (FPL)</span>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed">
-            The official portal for player registration, verified payments, squad management, and tournament updates.
+            The official portal for player registration, verified payments, squad management, and tournament updates. Est. 2022.
           </p>
         </div>
 
@@ -56,6 +56,15 @@ export const Footer: React.FC = () => {
         <div>
           <h4 className="font-semibold text-slate-200 mb-3 text-sm">Tournament Desk</h4>
           <ul className="space-y-2.5 text-xs">
+            <li className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>
+                Email:{' '}
+                <a href="mailto:fairplaypremierleague@gmail.com" className="text-white hover:text-emerald-400 font-semibold transition-colors">
+                  fairplaypremierleague@gmail.com
+                </a>
+              </span>
+            </li>
             <li className="flex items-center gap-2">
               <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>
@@ -103,7 +112,7 @@ export const Footer: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto mt-8 pt-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-        <p>© 2026 FPL Premier League. All rights reserved.</p>
+        <p>© 2022–2026 Fairplay Premier League (FPL). All rights reserved.</p>
         <div className="flex items-center gap-6">
           <span className="hover:text-slate-400 cursor-pointer">Terms & Conditions</span>
           <span className="hover:text-slate-400 cursor-pointer">Privacy Policy</span>

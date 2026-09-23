@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'FPL Premier League - Player Registration Portal',
+  title: 'Fairplay Premier League (FPL) - Player Registration Portal',
   description:
-    'Official player registration and payment portal for FPL Premier League. Register as a batsman, bowler, wicketkeeper, or all-rounder.',
+    'Official player registration and payment portal for Fairplay Premier League (FPL). Register as a batsman, bowler, wicketkeeper, or all-rounder.',
   icons: {
     icon: '/logo.png',
     apple: '/logo.png',

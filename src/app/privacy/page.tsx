@@ -41,7 +41,7 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold text-emerald-400">5. Contact</h2>
           <p className="text-slate-300 leading-relaxed">
-            For any privacy-related questions, contact us at: atulpawar07@gmail.com
+            For any privacy-related questions, contact us at: fairplaypremierleague@gmail.com
           </p>
         </section>
       </div>

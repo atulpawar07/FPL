@@ -9,10 +9,10 @@ import { Settings, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 export default function AdminSettingsPage() {
   const [formData, setFormData] = useState({
     id: '',
-    name: 'FPL Premier League',
+    name: 'Fairplay Premier League (FPL)',
     registrationFeeRupees: 500,
     maxRegistrations: 500,
-    contactEmail: '',
+    contactEmail: 'fairplaypremierleague@gmail.com',
     contactPhone: '+91 86525 26186',
     termsAndConditions: 'By registering, players agree to abide by all FPL rules.',
   });
@@ -28,10 +28,10 @@ export default function AdminSettingsPage() {
         if (!data.error) {
           setFormData({
             id: data.id || '',
-            name: data.name || 'FPL Premier League',
+            name: data.name || 'Fairplay Premier League (FPL)',
             registrationFeeRupees: data.registration_fee ? data.registration_fee / 100 : 500,
             maxRegistrations: data.max_players || data.max_registrations || 500,
-            contactEmail: data.contact_email || '',
+            contactEmail: data.contact_email || 'fairplaypremierleague@gmail.com',
             contactPhone: data.contact_phone || '+91 86525 26186',
             termsAndConditions: data.terms_and_conditions || 'By registering, players agree to abide by rules.',
           });

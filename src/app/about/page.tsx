@@ -32,7 +32,7 @@ export default function AboutPage() {
               About FairPlay Premier League (FPL)
             </h1>
             <p className="text-sm sm:text-base text-slate-300 max-w-3xl mx-auto leading-relaxed">
-              FairPlay Premier League (FPL) is a platform which has been formed to enhance the game of cricket
+              Established in 2022, FairPlay Premier League (FPL) is a platform which has been formed to enhance the game of cricket
               with those cricket enthusiasts who never got an opportunity or a platform to discover their skills
               and achieve their dreams. In Fairplay Premier League (FPL) we practice being sincere towards
               maintaining the integrity of the game by rendering{' '}

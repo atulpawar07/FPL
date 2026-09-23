@@ -48,7 +48,7 @@ export default function TermsPage() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold text-emerald-400">6. Contact</h2>
           <p className="text-slate-300 leading-relaxed">
-            For any queries, contact us at: atulpawar07@gmail.com
+            For any queries, contact us at: fairplaypremierleague@gmail.com
           </p>
         </section>
       </div>
