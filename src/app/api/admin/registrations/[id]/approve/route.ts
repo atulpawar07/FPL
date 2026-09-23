@@ -25,15 +25,22 @@ export async function POST(
       return NextResponse.json({ error: 'Registration not found' }, { status: 404 });
     }
 
-    const newStatus = action === 'REJECT' ? 'CANCELLED' : 'CONFIRMED';
-    const newPaymentStatus = action === 'REJECT' ? 'FAILED' : 'SUCCESSFUL';
+    let newStatus = 'CONFIRMED';
+    let newPaymentStatus = 'SUCCESSFUL';
+    if (action === 'REJECT') {
+      newStatus = 'REJECTED';
+      newPaymentStatus = 'FAILED';
+    } else if (action === 'CANCEL') {
+      newStatus = 'CANCELLED';
+      newPaymentStatus = 'REFUNDED';
+    }
 
     // Update the target registration status
     let { error: updateRegErr } = await supabase
       .from('registrations')
       .update({
-        status: newStatus,
         registration_status: newStatus,
+        status: newStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', registrationId);

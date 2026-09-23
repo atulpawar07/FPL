@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAdminAction } from '@/lib/audit/logger';
+import { requireAdmin } from '@/lib/auth/is-admin';
 
 export async function POST(req: NextRequest) {
   try {
+    const { user } = await requireAdmin();
     const body = await req.json();
     const { id, name, registrationFeeRupees, maxRegistrations, contactEmail, contactPhone, termsAndConditions } = body;
 
@@ -44,6 +46,7 @@ export async function POST(req: NextRequest) {
 
     // Write audit log entry
     await logAdminAction({
+      adminUserId: user.id,
       action: 'UPDATE_TOURNAMENT_SETTINGS',
       entityType: 'TOURNAMENT',
       entityId: tournamentId || 'unknown',
@@ -53,6 +56,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, tournamentId });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Settings update error' }, { status: 500 });
+    const status = err.message?.includes('Unauthorized') ? 403 : 500;
+    return NextResponse.json({ error: err.message || 'Settings update error' }, { status });
   }
 }
+

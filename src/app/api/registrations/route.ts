@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { generateRegistrationReference } from '@/lib/utils/format';
+import { uploadToStorageBucket } from '@/lib/storage/upload';
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid full name (at least 2 characters)' }, { status: 400 });
     }
 
-    const email = body.email || (body.mobile ? `${body.mobile}@fairplay.local` : 'player@fairplay.local');
+    const email = body.email || (body.mobile ? `${body.mobile}@fairplay.local` : null);
     const profileImageUrl = body.profileImageUrl || body.profilePhotoPath;
 
     if (!profileImageUrl) {
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // 1. Fetch target tournament
+    // 1. Fetch Target Tournament
     let tournament;
     if (body.tournamentId) {
       const { data: t } = await supabase
@@ -51,144 +51,78 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No active tournament found. Please ask the tournament admin to publish a tournament.' }, { status: 400 });
     }
 
-    if (!tournament.registration_open) {
-      return NextResponse.json({ error: 'Registration for this tournament is currently closed' }, { status: 400 });
+    const tournamentId = tournament.id;
+
+    // 2. Resolve or Create Player Profile
+    let playerId: string | null = null;
+    if (email) {
+      const { data: existingPlayer } = await supabase
+        .from('players')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+      if (existingPlayer) playerId = existingPlayer.id;
     }
 
-    const tournamentId = tournament.id;
-    const registrationFee = tournament.registration_fee || 50000;
+    if (!playerId && body.mobile) {
+      const { data: existingMobile } = await supabase
+        .from('players')
+        .select('id')
+        .eq('mobile', body.mobile)
+        .maybeSingle();
+      if (existingMobile) playerId = existingMobile.id;
+    }
 
-    // 2. Create or find player record in database
-    let playerId: string | null = null;
-    const { data: existingPlayer } = await supabase
-      .from('players')
-      .select('id, auth_user_id')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (existingPlayer) {
-      playerId = existingPlayer.id;
-    } else {
+    if (!playerId) {
       let authUserId: string | null = null;
       try {
         const supabaseServer = await createServerSupabaseClient();
         const { data: { user: currentUser } } = await supabaseServer.auth.getUser();
-        if (currentUser) {
-          authUserId = currentUser.id;
-        }
+        if (currentUser) authUserId = currentUser.id;
       } catch (e) {
         // Session not available
       }
 
-      if (!authUserId) {
-        const { data: usersData } = await supabase.auth.admin.listUsers();
-        const existingAuthUser = usersData?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-
-        if (existingAuthUser) {
-          authUserId = existingAuthUser.id;
-        } else if (usersData?.users && usersData.users.length > 0) {
-          const { data: newAuthUser } = await supabase.auth.admin.createUser({
-            email,
-            email_confirm: true,
-            user_metadata: { full_name: fullName },
-          });
-          authUserId = newAuthUser?.user?.id || usersData.users[0].id;
-        } else {
-          const { data: newAuthUser } = await supabase.auth.admin.createUser({
-            email,
-            email_confirm: true,
-            user_metadata: { full_name: fullName },
-          });
-          if (newAuthUser?.user) {
-            authUserId = newAuthUser.user.id;
-          }
-        }
-      }
-
-      if (authUserId) {
-        const playerPayload: any = {
-          auth_user_id: authUserId,
+      const { data: newPlayer, error: pErr } = await supabase
+        .from('players')
+        .insert({
+          registration_reference: 'REG-REF-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
           full_name: fullName,
-          email,
+          email: email || null,
+          mobile: body.mobile || null,
+          auth_user_id: authUserId,
           profile_image_url: profileImageUrl,
           cricket_role: cricketRole,
           batting_style: battingStyle,
           jersey_size: jerseySize,
-        };
+          created_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
 
-        let { data: newPlayer, error: playerErr } = await supabase
-          .from('players')
-          .insert(playerPayload)
-          .select('id')
-          .single();
-
-        if (playerErr && playerErr.message?.includes('jersey_size')) {
-          delete playerPayload.jersey_size;
-          const { data: retryNewPlayer } = await supabase
-            .from('players')
-            .insert(playerPayload)
-            .select('id')
-            .single();
-          newPlayer = retryNewPlayer;
-        }
-
-        if (newPlayer) {
-          playerId = newPlayer.id;
-        } else {
-          const { data: retryPlayer } = await supabase
-            .from('players')
-            .select('id')
-            .eq('email', email)
-            .maybeSingle();
-          if (retryPlayer) {
-            playerId = retryPlayer.id;
-          }
-        }
+      if (pErr || !newPlayer) {
+        throw new Error(`Failed to create player profile: ${pErr?.message || 'Unknown error'}`);
       }
-
-      if (!playerId) {
-        const { data: anyPlayer } = await supabase
-          .from('players')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
-        if (anyPlayer) {
-          playerId = anyPlayer.id;
-        }
-      }
+      playerId = newPlayer.id;
     }
 
-    if (!playerId) {
-      return NextResponse.json({ error: 'Failed to create or resolve player profile' }, { status: 500 });
+    // 3. Handle Payment Screenshot File Upload if base64 provided
+    let screenshotBucket = 'payment-screenshots';
+    let screenshotObjectPath: string | null = null;
+
+    if (body.paymentScreenshotBase64) {
+      const cleanBase64 = body.paymentScreenshotBase64.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      const filename = `player_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.png`;
+      screenshotObjectPath = `${tournamentId}/${filename}`;
+
+      await uploadToStorageBucket(screenshotBucket, screenshotObjectPath, buffer, 'image/png');
+    } else if (body.paymentScreenshotUrl) {
+      screenshotObjectPath = body.paymentScreenshotUrl;
     }
 
-    // Check if player is already registered for this tournament
-    const { data: existingReg } = await supabase
-      .from('registrations')
-      .select('id, registration_number, registration_status, waitlist_position')
-      .eq('tournament_id', tournamentId)
-      .eq('player_id', playerId)
-      .maybeSingle();
-
-    if (existingReg) {
-      return NextResponse.json({
-        success: true,
-        alreadyRegistered: true,
-        registrationId: existingReg.id,
-        registrationNumber: existingReg.registration_number,
-        registrationStatus: existingReg.registration_status,
-        waitlistPosition: existingReg.waitlist_position,
-        message: 'You are already registered for this tournament',
-      });
-    }
-
-    // 3. Create Registration Record via RPC allocate_registration_slot (or direct fallback)
-    let registrationId: string;
-    let registrationNumber: string;
-    let registrationStatus: string = 'PENDING';
-    let waitlistPosition: number | null = null;
-
-    const { data: rpcData, error: rpcErr } = await supabase.rpc('allocate_registration_slot', {
+    // 4. Atomic Registration Allocation via allocate_player_registration_v2
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('allocate_player_registration_v2', {
       p_tournament_id: tournamentId,
       p_player_id: playerId,
       p_registered_name_snapshot: fullName,
@@ -196,93 +130,33 @@ export async function POST(req: NextRequest) {
       p_registered_batting_style_snapshot: battingStyle,
       p_registered_jersey_size_snapshot: jerseySize,
       p_registered_image_snapshot: profileImageUrl,
+      p_screenshot_bucket: screenshotBucket,
+      p_screenshot_object_path: screenshotObjectPath,
     });
 
-    if (!rpcErr && rpcData && rpcData.length > 0) {
-      registrationId = rpcData[0].registration_id;
-      registrationNumber = rpcData[0].registration_number;
-      registrationStatus = rpcData[0].registration_status;
-      waitlistPosition = rpcData[0].waitlist_position;
-    } else {
-      // Direct Insert Fallback if RPC function not created in DB yet
-      registrationNumber = generateRegistrationReference();
-
-      // Check current capacity
-      const { count: confirmedCount } = await supabase
-        .from('registrations')
-        .select('id', { count: 'exact', head: true })
-        .eq('tournament_id', tournamentId)
-        .eq('registration_status', 'CONFIRMED');
-
-      if ((confirmedCount || 0) < tournament.max_players) {
-        registrationStatus = 'PENDING';
-        waitlistPosition = null;
-      } else {
-        registrationStatus = 'WAITING_LIST';
-        const { count: waitlistCount } = await supabase
-          .from('registrations')
-          .select('id', { count: 'exact', head: true })
-          .eq('tournament_id', tournamentId)
-          .eq('registration_status', 'WAITING_LIST');
-        waitlistPosition = (waitlistCount || 0) + 1;
-      }
-
-      const regPayload: any = {
-        tournament_id: tournamentId,
-        player_id: playerId,
-        registration_number: registrationNumber,
-        registration_status: registrationStatus,
-        waitlist_position: waitlistPosition,
-        registered_name_snapshot: fullName,
-        registered_role_snapshot: cricketRole,
-        registered_batting_style_snapshot: battingStyle,
-        registered_jersey_size_snapshot: jerseySize,
-        registered_image_snapshot: profileImageUrl,
-      };
-
-      let { data: newReg, error: regErr } = await supabase
-        .from('registrations')
-        .insert(regPayload)
-        .select('id')
-        .single();
-
-      if (regErr && regErr.message?.includes('column')) {
-        delete regPayload.registered_jersey_size_snapshot;
-        delete regPayload.registered_batting_style_snapshot;
-        regPayload.registered_role_snapshot = regPayload.registered_role_snapshot || 'BATSMAN';
-        regPayload.registered_image_snapshot = regPayload.registered_image_snapshot || profileImageUrl || '/logo.png';
-
-        const retryRes = await supabase
-          .from('registrations')
-          .insert(regPayload)
-          .select('id')
-          .single();
-        newReg = retryRes.data;
-        regErr = retryRes.error;
-      }
-
-      if (regErr || !newReg) throw regErr || new Error('Failed to insert registration');
-      registrationId = newReg.id;
+    if (rpcErr || !rpcData || rpcData.length === 0) {
+      console.error('RPC allocate_player_registration_v2 Error:', rpcErr);
+      return NextResponse.json({
+        error: rpcErr?.message || 'Failed to complete registration atomically',
+      }, { status: 400 });
     }
 
-    // Create pending payment record
-    await supabase.from('payments').insert({
-      registration_id: registrationId,
-      amount: registrationFee,
-      payment_method: 'UPI_QR',
-      payment_status: 'PENDING',
-    });
+    const result = rpcData[0];
 
     return NextResponse.json({
       success: true,
-      registrationId,
-      registrationNumber,
-      registrationStatus,
-      waitlistPosition,
+      registrationId: result.registration_id,
+      registrationNumber: result.registration_number,
+      registrationStatus: result.registration_status,
+      waitlistPosition: result.waitlist_position,
+      paymentId: result.payment_id,
       paymentOrder: {
         orderId: `order_${Date.now()}`,
-        amount: registrationFee,
+        amount: tournament.registration_fee || 50000,
       },
+      message: result.registration_status === 'WAITING_LIST' 
+        ? `Player capacity full. Placed on waitlist position #${result.waitlist_position}.`
+        : 'Registration completed successfully!',
     });
   } catch (err: any) {
     console.error('Registration API POST error:', err);

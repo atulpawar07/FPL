@@ -25,7 +25,7 @@ export async function GET() {
 // POST /api/admin/managers - Grant manager role to a user email
 export async function POST(req: NextRequest) {
   try {
-    const adminUser = await requireAdmin();
+    const { user } = await requireAdmin();
     const supabase = createAdminClient();
 
     const { email, displayName } = await req.json();
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     const { data: newManager, error: insertErr } = await supabase
       .from('managers')
       .insert({
-        granted_by: adminUser.id,
+        granted_by: user.id,
         user_email: cleanEmail,
         user_id: profile?.id || null,
         display_name: displayName || cleanEmail.split('@')[0],

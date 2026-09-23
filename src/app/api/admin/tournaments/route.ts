@@ -26,7 +26,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const adminUser = await requireAdmin();
+    const { user } = await requireAdmin();
     const body = await req.json();
 
     const {
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       waitlist_enabled: waitlistEnabled !== undefined ? Boolean(waitlistEnabled) : true,
       icon_player_enabled: iconPlayerEnabled !== undefined ? Boolean(iconPlayerEnabled) : false,
       owner_is_playing_enabled: ownerIsPlayingEnabled !== undefined ? Boolean(ownerIsPlayingEnabled) : true,
-      created_by: adminUser.id,
+      created_by: user.id,
       updated_at: new Date().toISOString(),
     };
 
