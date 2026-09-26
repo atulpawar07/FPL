@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireManager } from '@/lib/auth/is-manager';
+import { getSignedScreenshotUrl, resolveImageUrl } from '@/lib/storage/upload';
 
 export async function GET(
   req: NextRequest,
@@ -93,6 +94,24 @@ export async function GET(
       payments = pData || [];
     }
 
+    // Enrich payments with 15-minute signed URLs for private storage objects
+    const enrichedPayments = await Promise.all(
+      payments.map(async (p: any) => {
+        let signedScreenshotUrl = p.payment_screenshot_url || '';
+        if (p.screenshot_object_path) {
+          signedScreenshotUrl = await getSignedScreenshotUrl(
+            p.screenshot_bucket || 'payment-screenshots',
+            p.screenshot_object_path,
+            900
+          );
+        }
+        return {
+          ...p,
+          payment_screenshot_url: signedScreenshotUrl,
+        };
+      })
+    );
+
     // 4. Fetch Team Owners if OWNER_BASED
     let teamOwners: any[] = [];
     if (tournament.tournament_type === 'OWNER_BASED') {
@@ -101,15 +120,28 @@ export async function GET(
         .select('*')
         .eq('tournament_id', tournamentId)
         .order('slot_number', { ascending: true });
-      teamOwners = ownersData || [];
+
+      teamOwners = await Promise.all(
+        (ownersData || []).map(async (o: any) => {
+          // Link owner payment signed URL if matching registration exists
+          const matchingPayment = enrichedPayments.find((p: any) => p.team_owner_id === o.id || p.registration_id === o.owner_registration_id);
+          const ownerScreenshotUrl = matchingPayment?.payment_screenshot_url || o.payment_screenshot_url || '';
+          return {
+            ...o,
+            team_logo_url: resolveImageUrl(o.team_logo_url, 'team-logos', '/logo.png'),
+            payment_screenshot_url: ownerScreenshotUrl,
+          };
+        })
+      );
     }
 
     // Combine registrations with payments
     const enrichedRegistrations = registrations.map((r: any) => {
-      const payment = payments.find((p: any) => p.registration_id === r.id) || null;
+      const payment = enrichedPayments.find((p: any) => p.registration_id === r.id) || null;
       const effectiveStatus = r.status || r.registration_status || 'PENDING';
       return {
         ...r,
+        registered_image_snapshot: resolveImageUrl(r.registered_image_snapshot, 'profile-images', '/logo.png'),
         registration_status: effectiveStatus,
         status: effectiveStatus,
         payment,

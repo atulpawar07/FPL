@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { uploadToStorageBucket } from '@/lib/storage/upload';
+import { uploadToStorageBucket, validateImageFileBuffer } from '@/lib/storage/upload';
 
 export async function POST(req: NextRequest) {
   try {
+    const supabaseServer = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     const body = await req.json();
 
     const fullName = body.fullName?.trim();
@@ -12,9 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid full name (at least 2 characters)' }, { status: 400 });
     }
 
-    const email = body.email || (body.mobile ? `${body.mobile}@fairplay.local` : null);
     const profileImageUrl = body.profileImageUrl || body.profilePhotoPath;
-
     if (!profileImageUrl) {
       return NextResponse.json({ error: 'Please upload your profile photo to complete registration' }, { status: 400 });
     }
@@ -24,12 +29,25 @@ export async function POST(req: NextRequest) {
     const battingStyle = body.battingStyle || 'RIGHT_HAND';
     const jerseySize = body.jerseySize || 'M';
 
-    const supabase = createAdminClient();
+    // 1. Resolve Player Profile from Authenticated Session ONLY
+    const { data: playerProfile, error: profileErr } = await supabaseServer
+      .from('players')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .maybeSingle();
 
-    // 1. Fetch Target Tournament
+    if (profileErr || !playerProfile?.id) {
+      return NextResponse.json({ error: 'You must complete your player profile before registering for a tournament.' }, { status: 400 });
+    }
+
+    const playerId = playerProfile.id;
+
+    const supabaseAdmin = createAdminClient();
+
+    // 2. Fetch Target Tournament
     let tournament;
     if (body.tournamentId) {
-      const { data: t } = await supabase
+      const { data: t } = await supabaseAdmin
         .from('tournaments')
         .select('id, name, registration_fee, max_players, registration_open, waitlist_enabled')
         .eq('id', body.tournamentId)
@@ -38,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!tournament) {
-      const { data: latest } = await supabase
+      const { data: latest } = await supabaseAdmin
         .from('tournaments')
         .select('id, name, registration_fee, max_players, registration_open, waitlist_enabled')
         .order('created_at', { ascending: false })
@@ -53,76 +71,23 @@ export async function POST(req: NextRequest) {
 
     const tournamentId = tournament.id;
 
-    // 2. Resolve or Create Player Profile
-    let playerId: string | null = null;
-    if (email) {
-      const { data: existingPlayer } = await supabase
-        .from('players')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-      if (existingPlayer) playerId = existingPlayer.id;
-    }
-
-    if (!playerId && body.mobile) {
-      const { data: existingMobile } = await supabase
-        .from('players')
-        .select('id')
-        .eq('mobile', body.mobile)
-        .maybeSingle();
-      if (existingMobile) playerId = existingMobile.id;
-    }
-
-    if (!playerId) {
-      let authUserId: string | null = null;
-      try {
-        const supabaseServer = await createServerSupabaseClient();
-        const { data: { user: currentUser } } = await supabaseServer.auth.getUser();
-        if (currentUser) authUserId = currentUser.id;
-      } catch (e) {
-        // Session not available
-      }
-
-      const { data: newPlayer, error: pErr } = await supabase
-        .from('players')
-        .insert({
-          registration_reference: 'REG-REF-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-          full_name: fullName,
-          email: email || null,
-          mobile: body.mobile || null,
-          auth_user_id: authUserId,
-          profile_image_url: profileImageUrl,
-          cricket_role: cricketRole,
-          batting_style: battingStyle,
-          jersey_size: jerseySize,
-          created_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
-
-      if (pErr || !newPlayer) {
-        throw new Error(`Failed to create player profile: ${pErr?.message || 'Unknown error'}`);
-      }
-      playerId = newPlayer.id;
-    }
-
-    // 3. Handle Payment Screenshot File Upload if base64 provided
-    let screenshotBucket = 'payment-screenshots';
-    let screenshotObjectPath: string | null = null;
+    // 3. Pre-validate Payment Screenshot File (if submitted)
+    // We ignore body.paymentScreenshotUrl to prevent client path spoofing.
+    const screenshotBucket = 'payment-screenshots';
+    let screenshotBuffer: Buffer | null = null;
+    let screenshotValidation: any = null;
 
     if (body.paymentScreenshotBase64) {
       const cleanBase64 = body.paymentScreenshotBase64.replace(/^data:image\/\w+;base64,/, '');
-      const buffer = Buffer.from(cleanBase64, 'base64');
-      const filename = `player_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.png`;
-      screenshotObjectPath = `${tournamentId}/${filename}`;
-
-      await uploadToStorageBucket(screenshotBucket, screenshotObjectPath, buffer, 'image/png');
-    } else if (body.paymentScreenshotUrl) {
-      screenshotObjectPath = body.paymentScreenshotUrl;
+      screenshotBuffer = Buffer.from(cleanBase64, 'base64');
+      screenshotValidation = validateImageFileBuffer(screenshotBuffer);
+      if (!screenshotValidation.isValid || !screenshotValidation.mimeType || !screenshotValidation.extension) {
+        return NextResponse.json({ error: screenshotValidation.error || 'Invalid payment screenshot file format' }, { status: 400 });
+      }
     }
 
     // 4. Atomic Registration Allocation via allocate_player_registration_v2
-    const { data: rpcData, error: rpcErr } = await supabase.rpc('allocate_player_registration_v2', {
+    const { data: rpcData, error: rpcErr } = await supabaseAdmin.rpc('allocate_player_registration_v2', {
       p_tournament_id: tournamentId,
       p_player_id: playerId,
       p_registered_name_snapshot: fullName,
@@ -131,7 +96,7 @@ export async function POST(req: NextRequest) {
       p_registered_jersey_size_snapshot: jerseySize,
       p_registered_image_snapshot: profileImageUrl,
       p_screenshot_bucket: screenshotBucket,
-      p_screenshot_object_path: screenshotObjectPath,
+      p_screenshot_object_path: null,
     });
 
     if (rpcErr || !rpcData || rpcData.length === 0) {
@@ -142,6 +107,33 @@ export async function POST(req: NextRequest) {
     }
 
     const result = rpcData[0];
+    const registrationId = result.registration_id;
+
+    // 5. Upload Payment Screenshot to Storage using canonical registrationId path
+    let screenshotObjectPath: string | null = null;
+    if (screenshotBuffer && screenshotValidation) {
+      const ext = screenshotValidation.extension;
+      const filename = `${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
+      screenshotObjectPath = `${tournamentId}/${registrationId}/${filename}`;
+
+      try {
+        await uploadToStorageBucket(screenshotBucket, screenshotObjectPath, screenshotBuffer, screenshotValidation.mimeType);
+
+        // Update payments row with canonical screenshot object path
+        if (result.payment_id) {
+          await supabaseAdmin
+            .from('payments')
+            .update({
+              screenshot_bucket: screenshotBucket,
+              screenshot_object_path: screenshotObjectPath,
+            })
+            .eq('id', result.payment_id);
+        }
+      } catch (uploadErr: any) {
+        console.error('Failed to upload payment screenshot:', uploadErr);
+        // Registration is preserved; client can upload screenshot via receipt page if needed
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -154,7 +146,7 @@ export async function POST(req: NextRequest) {
         orderId: `order_${Date.now()}`,
         amount: tournament.registration_fee || 50000,
       },
-      message: result.registration_status === 'WAITING_LIST' 
+      message: result.registration_status === 'WAITING_LIST'
         ? `Player capacity full. Placed on waitlist position #${result.waitlist_position}.`
         : 'Registration completed successfully!',
     });
