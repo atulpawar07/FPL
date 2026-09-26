@@ -191,15 +191,18 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
     return nameMatch && statusMatch;
   });
 
-  const pendingApprovals = registrations.filter(
-    (r) =>
-      r.registration_status === 'WAITING_LIST' ||
+  const pendingApprovals = registrations.filter((r) => {
+    const isConfirmed = r.registration_status === 'CONFIRMED' || r.status === 'CONFIRMED';
+    const isRejected = r.registration_status === 'REJECTED' || r.status === 'REJECTED';
+    const isCancelled = r.registration_status === 'CANCELLED' || r.status === 'CANCELLED';
+    if (isConfirmed || isRejected || isCancelled) return false;
+    return (
       r.registration_status === 'PENDING' ||
-      r.status === 'PENDING' ||
-      !r.payment ||
+      r.registration_status === 'WAITING_LIST' ||
       r.payment?.payment_status === 'PENDING' ||
       r.payment?.payment_status === 'AWAITING_ORGANISER_ACKNOWLEDGEMENT'
-  );
+    );
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-white">

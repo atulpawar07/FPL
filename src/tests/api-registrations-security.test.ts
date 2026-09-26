@@ -142,6 +142,7 @@ describe('API Route Security - /api/registrations', () => {
         tournamentId: 'tourn-123',
         ownerName: 'Owner',
         contactEmail: 'owner@example.com',
+        iconProfileImageUrl: 'data:image/png;base64,iVBORw0KGgo=',
         playerId: 'hacker-supplied-id'
       }),
     });

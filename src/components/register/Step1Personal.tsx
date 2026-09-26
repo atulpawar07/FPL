@@ -104,7 +104,7 @@ export const Step1Personal: React.FC<Step1Props> = ({ initialData, onNext }) => 
       return;
     }
 
-    onNext({ ...formData, mobile: cleanMobile });
+    onNext({ ...formData, mobile: cleanMobile, registrationFor: regTarget });
   };
 
   return (

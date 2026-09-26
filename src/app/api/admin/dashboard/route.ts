@@ -3,45 +3,36 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdmin } from '@/lib/auth/is-admin';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 export async function GET() {
   try {
     await requireAdmin();
     const supabase = createAdminClient();
 
-    // Fetch all tournaments ordered by creation date
-    const { data: tournaments, error: tourneyErr } = await supabase
-      .from('tournaments')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Execute queries in parallel for high performance
+    const [
+      { data: tournaments, error: tourneyErr },
+      { data: registrations },
+      { data: payments },
+      { data: teamOwners },
+    ] = await Promise.all([
+      supabase.from('tournaments').select('*').order('created_at', { ascending: false }),
+      supabase.from('registrations').select('id, tournament_id, registration_status, status'),
+      supabase.from('payments').select('id, amount, payment_status, registration_id'),
+      supabase.from('team_owners').select('id, tournament_id, status, payment_status'),
+    ]);
 
     if (tourneyErr) throw tourneyErr;
 
-    // Fetch all registrations
-    const { data: registrations } = await supabase
-      .from('registrations')
-      .select('id, tournament_id, registration_status');
-
-    // Fetch all payments
-    const { data: payments } = await supabase
-      .from('payments')
-      .select('id, amount, payment_status, registration_id');
-
-    // Fetch team owners
-    const { data: teamOwners } = await supabase
-      .from('team_owners')
-      .select('id, tournament_id, status, payment_status');
-
     const tournamentSummaries = (tournaments || []).map((t) => {
       const tRegs = (registrations || []).filter((r) => r.tournament_id === t.id);
-      const confirmedCount = tRegs.filter((r) => r.registration_status === 'CONFIRMED').length;
-      const waitlistCount = tRegs.filter((r) => r.registration_status === 'WAITING_LIST').length;
-      
+      const confirmedCount = tRegs.filter((r) => r.registration_status === 'CONFIRMED' || r.status === 'CONFIRMED').length;
+      const waitlistCount = tRegs.filter((r) => r.registration_status === 'WAITING_LIST' || r.status === 'WAITING_LIST').length;
+
       const tRegIds = new Set(tRegs.map((r) => r.id));
       const tPayments = (payments || []).filter((p) => tRegIds.has(p.registration_id));
       const successfulPayments = tPayments.filter((p) => p.payment_status === 'SUCCESSFUL').length;
-      const pendingPayments = tPayments.filter((p) => p.payment_status === 'PENDING').length;
+      const pendingPayments = tPayments.filter((p) => p.payment_status === 'PENDING' || p.payment_status === 'AWAITING_ORGANISER_ACKNOWLEDGEMENT').length;
       const revenuePaise = tPayments
         .filter((p) => p.payment_status === 'SUCCESSFUL')
         .reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -72,7 +63,7 @@ export async function GET() {
 
     const totalRegisteredPlayers = registrations?.length || 0;
     const totalSuccessfulPayments = payments?.filter((p) => p.payment_status === 'SUCCESSFUL').length || 0;
-    const totalPendingPayments = payments?.filter((p) => p.payment_status === 'PENDING').length || 0;
+    const totalPendingPayments = payments?.filter((p) => p.payment_status === 'PENDING' || p.payment_status === 'AWAITING_ORGANISER_ACKNOWLEDGEMENT').length || 0;
     const totalRevenuePaise = payments
       ?.filter((p) => p.payment_status === 'SUCCESSFUL')
       .reduce((sum, p) => sum + (p.amount || 0), 0) || 0;

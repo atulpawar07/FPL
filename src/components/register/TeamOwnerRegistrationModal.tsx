@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { formatPaiseToINR } from '@/lib/utils/format';
 import { compressImageFile } from '@/lib/utils/image';
+import { UnifiedParticipantForm, ParticipantFormData } from './UnifiedParticipantForm';
 import {
   Crown,
-  Upload,
   CheckCircle2,
   ShieldAlert,
   Image as ImageIcon,
@@ -17,8 +17,6 @@ import {
   Star,
 } from 'lucide-react';
 
-import { JerseyInfoTooltip } from '@/components/ui/JerseyInfoTooltip';
-
 interface TeamOwnerRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -26,103 +24,60 @@ interface TeamOwnerRegistrationModalProps {
   currentUser?: any;
 }
 
-const CRICKET_ROLE_OPTIONS = [
-  { value: 'BATSMAN', label: 'Batsman' },
-  { value: 'BOWLER', label: 'Bowler' },
-  { value: 'ALL_ROUNDER', label: 'All-Rounder' },
-  { value: 'BATSMAN_WICKETKEEPER', label: 'Batsman + Wicketkeeper' },
-  { value: 'BOWLER_WICKETKEEPER', label: 'Bowler + Wicketkeeper' },
-];
-
-const BATTING_STYLE_OPTIONS = [
-  { value: 'RIGHT_HAND', label: 'Right Hand' },
-  { value: 'LEFT_HAND', label: 'Left Hand' },
-];
-
-const BOWLING_STYLE_OPTIONS = [
-  { value: '', label: "Doesn't Bowl" },
-  { value: 'RIGHT_ARM_FAST', label: 'Right Arm Fast' },
-  { value: 'RIGHT_ARM_MEDIUM', label: 'Right Arm Medium' },
-  { value: 'RIGHT_ARM_SPIN', label: 'Right Arm Spin' },
-  { value: 'LEFT_ARM_FAST', label: 'Left Arm Fast' },
-  { value: 'LEFT_ARM_MEDIUM', label: 'Left Arm Medium' },
-  { value: 'LEFT_ARM_SPIN', label: 'Left Arm Spin' },
-];
-
-const JERSEY_SIZE_OPTIONS = [
-  { value: 'S', label: 'Small (S - 38")' },
-  { value: 'M', label: 'Medium (M - 40")' },
-  { value: 'L', label: 'Large (L - 42")' },
-  { value: 'XL', label: 'X-Large (XL - 44")' },
-  { value: 'XXL', label: 'XX-Large (XXL - 46")' },
-  { value: '3XL', label: '3X-Large (3XL - 48")' },
-];
-
-const SectionHeader: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  badge?: string;
-  badgeColor?: string;
-}> = ({ icon, title, badge, badgeColor = 'text-amber-400 bg-amber-950 border-amber-500/40' }) => (
-  <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-    <span className="text-xs font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-      {icon}
-      {title}
-    </span>
-    {badge && (
-      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeColor}`}>
-        {badge}
-      </span>
-    )}
-  </div>
-);
-
-const SelectField: React.FC<{
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}> = ({ label, value, onChange, options }) => (
-  <div>
-    <label className="text-[11px] font-medium text-slate-300 block mb-1">{label}</label>
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  </div>
-);
-
 export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProps> = ({
   isOpen,
   onClose,
   tournament,
   currentUser,
 }) => {
-  // ---- OWNER / PLAYER #1 STATE ----
-  const [ownerName, setOwnerName] = useState(
-    currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || ''
-  );
-  const [contactEmail, setContactEmail] = useState(currentUser?.email || '');
-  const [contactPhone, setContactPhone] = useState('');
-  // Owner Player #1 snapshot fields (same fields as normal Player)
-  const [ownerRole, setOwnerRole] = useState('BATSMAN');
-  const [ownerBattingStyle, setOwnerBattingStyle] = useState('RIGHT_HAND');
-  const [ownerBowlingStyle, setOwnerBowlingStyle] = useState('');
-  const [ownerJerseySize, setOwnerJerseySize] = useState('M');
-  // Owner profile image: stored as base64 data URL for preview; sent as-is to API
-  const [ownerProfileImageUrl, setOwnerProfileImageUrl] = useState('');
+  // Owner Participant Data
+  const [ownerData, setOwnerData] = useState<ParticipantFormData>({
+    fullName: currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || '',
+    email: currentUser?.email || '',
+    mobile: '',
+    cricketRole: 'BATSMAN',
+    battingStyle: 'RIGHT_HAND',
+    bowlingStyle: '',
+    jerseyName: '',
+    jerseyNumber: '',
+    jerseySize: 'M',
+    photoUrl: '',
+  });
 
-  // ---- TEAM STATE ----
+  // Team Data
   const [teamName, setTeamName] = useState('');
   const [teamLogoUrl, setTeamLogoUrl] = useState('');
   const [teamLogoBase64, setTeamLogoBase64] = useState('');
+
+  // Icon Participant Data
+  const [iconData, setIconData] = useState<ParticipantFormData>({
+    fullName: '',
+    email: currentUser?.email || '',
+    mobile: '',
+    cricketRole: 'BATSMAN',
+    battingStyle: 'RIGHT_HAND',
+    bowlingStyle: '',
+    jerseyName: '',
+    jerseyNumber: '',
+    jerseySize: 'M',
+    photoUrl: '',
+  });
+
+  // Payment Data
+  const [paymentMethod, setPaymentMethod] = useState<'UPI_QR' | 'ACKNOWLEDGE_BY_ORGANISER'>('UPI_QR');
+  const [screenshotBase64, setScreenshotBase64] = useState('');
+
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Fee calculation
+  const ownerFeePaise = tournament?.owner_registration_fee || 900000;
+  const playerFeePaise = tournament?.registration_fee || 90000;
+  const totalClubbedFeePaise = ownerFeePaise + playerFeePaise;
+  const ownerFeeDisplay = formatPaiseToINR(ownerFeePaise);
+  const playerFeeDisplay = formatPaiseToINR(playerFeePaise);
+  const totalClubbedFeeDisplay = formatPaiseToINR(totalClubbedFeePaise);
 
   const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -141,62 +96,6 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
     reader.readAsDataURL(file);
   };
 
-  // ---- ICON / PLAYER #2 STATE ----
-  const [iconPlayerName, setIconPlayerName] = useState('');
-  const [iconPlayerMobile, setIconPlayerMobile] = useState('');
-  const [iconPlayerRole, setIconPlayerRole] = useState('BATSMAN');
-  const [iconPlayerBattingStyle, setIconPlayerBattingStyle] = useState('RIGHT_HAND');
-  const [iconPlayerBowlingStyle, setIconPlayerBowlingStyle] = useState('');
-
-  // ---- PAYMENT STATE ----
-  const [paymentMethod, setPaymentMethod] = useState<'UPI_QR' | 'ACKNOWLEDGE_BY_ORGANISER'>('UPI_QR');
-  const [screenshotBase64, setScreenshotBase64] = useState('');
-
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  // Fee calculation
-  const ownerFeePaise = tournament?.owner_registration_fee || 900000;
-  const playerFeePaise = tournament?.registration_fee || 90000;
-  const totalClubbedFeePaise = ownerFeePaise + playerFeePaise;
-  const ownerFeeDisplay = formatPaiseToINR(ownerFeePaise);
-  const playerFeeDisplay = formatPaiseToINR(playerFeePaise);
-  const totalClubbedFeeDisplay = formatPaiseToINR(totalClubbedFeePaise);
-
-  const isIconRequired = Boolean(tournament?.icon_player_enabled);
-
-  // Owner profile image upload handler
-  const handleOwnerImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setErrorMsg('Profile photo must be JPG, PNG or WebP');
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setErrorMsg('Profile photo must be under 2 MB');
-      return;
-    }
-    try {
-      const compressed = await compressImageFile(file);
-      if (compressed) {
-        setOwnerProfileImageUrl(compressed);
-        setErrorMsg(null);
-        return;
-      }
-    } catch {
-      // Fallback to raw FileReader
-    }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setOwnerProfileImageUrl(reader.result as string);
-      setErrorMsg(null);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Payment screenshot upload handler
   const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -217,12 +116,18 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!ownerName.trim() || !contactEmail.trim() || !teamName.trim()) {
+    // Validation
+    if (!ownerData.photoUrl) {
+      setErrorMsg('Please upload the owner profile photo');
+      return;
+    }
+
+    if (!ownerData.fullName.trim() || !ownerData.email.trim() || !teamName.trim()) {
       setErrorMsg('Team Name, Owner Name, and Contact Email are required');
       return;
     }
 
-    if (!contactPhone.trim()) {
+    if (!ownerData.mobile.trim()) {
       setErrorMsg('Owner mobile number is required');
       return;
     }
@@ -232,8 +137,19 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
       return;
     }
 
-    if (isIconRequired && !iconPlayerName.trim()) {
-      setErrorMsg('Icon Player Name is required for this tournament');
+    // MANDATORY ICON PHOTO AND DATA VALIDATION
+    if (!iconData.photoUrl) {
+      setErrorMsg('Icon player profile photo is required');
+      return;
+    }
+
+    if (!iconData.fullName.trim()) {
+      setErrorMsg('Icon player full name is required');
+      return;
+    }
+
+    if (!iconData.mobile.trim()) {
+      setErrorMsg('Icon player mobile number is required');
       return;
     }
 
@@ -248,15 +164,15 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
         body: JSON.stringify({
           tournamentId: tournament.id,
           // Owner identity
-          ownerName: ownerName.trim(),
-          contactEmail: contactEmail.trim().toLowerCase(),
-          contactPhone: contactPhone.trim(),
-          // Owner Player #1 complete snapshot fields
-          ownerRole,
-          ownerBattingStyle,
-          ownerBowlingStyle: ownerBowlingStyle || null,
-          ownerJerseySize,
-          ownerProfileImageUrl: ownerProfileImageUrl || null,
+          ownerName: ownerData.fullName.trim(),
+          contactEmail: ownerData.email.trim().toLowerCase(),
+          contactPhone: ownerData.mobile.trim(),
+          // Owner Player #1 snapshot fields
+          ownerRole: ownerData.cricketRole,
+          ownerBattingStyle: ownerData.battingStyle,
+          ownerBowlingStyle: ownerData.bowlingStyle || null,
+          ownerJerseySize: ownerData.jerseySize,
+          ownerProfileImageUrl: ownerData.photoUrl || null,
           // Team
           teamName: teamName.trim(),
           teamLogoBase64: teamLogoBase64 || null,
@@ -264,12 +180,12 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
           paymentMethod,
           paymentScreenshotBase64: screenshotBase64 || null,
           // Icon Player #2 fields
-          iconPlayerName: iconPlayerName.trim(),
-          iconPlayerMobile: iconPlayerMobile.trim(),
-          iconPlayerRole,
-          iconPlayerBattingStyle,
-          iconPlayerBowlingStyle: iconPlayerBowlingStyle || null,
-          // iconExistingPlayerId intentionally NOT sent — API drops it anyway
+          iconPlayerName: iconData.fullName.trim(),
+          iconPlayerMobile: iconData.mobile.trim(),
+          iconPlayerRole: iconData.cricketRole,
+          iconPlayerBattingStyle: iconData.battingStyle,
+          iconPlayerBowlingStyle: iconData.bowlingStyle || null,
+          iconProfileImageUrl: iconData.photoUrl,
         }),
       });
 
@@ -300,7 +216,6 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
       maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-5 text-xs sm:text-sm">
-
         {/* CLUBBED FEE SUMMARY BANNER */}
         <div className="p-4 bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border border-amber-500/50 rounded-2xl space-y-2 shadow-xl">
           <div className="flex items-center justify-between">
@@ -340,134 +255,28 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
           </div>
         )}
 
-        {/* ============================================================
-            SECTION 1: OWNER / PLAYER #1
-            The authenticated Owner is Player #1 of the team.
-            These fields create a tournament-specific snapshot independent
-            of the reusable player profile.
-            ============================================================ */}
+        {/* SECTION 1: OWNER PARTICIPANT DETAILS */}
         <div className="p-4 bg-amber-950/20 border border-amber-500/40 rounded-2xl space-y-3">
-          <SectionHeader
-            icon={<UserCheck className="w-4 h-4 text-amber-400" />}
-            title="Owner / Player #1"
+          <UnifiedParticipantForm
+            title="Owner / Player #1 Details"
+            subtitle="Your details as team owner and first player of the squad."
             badge="Player Slot #1"
             badgeColor="text-amber-400 bg-amber-950 border-amber-500/40"
+            initialData={ownerData}
+            onChange={setOwnerData}
+            currentUserEmail={currentUser?.email}
+            photoRequired={true}
           />
-          <p className="text-[11px] text-slate-400 -mt-1 mb-2">
-            Your details as the team owner and first player of the squad.
-          </p>
-
-          {/* Owner Profile Photo */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-medium text-slate-300 block">
-              Profile Photo
-            </label>
-            <div className="flex items-center gap-4 p-3 bg-slate-950/60 border border-dashed border-slate-700 rounded-xl">
-              {ownerProfileImageUrl ? (
-                <img
-                  src={ownerProfileImageUrl}
-                  alt="Owner Photo"
-                  className="w-16 h-16 rounded-full object-cover border-2 border-amber-500 shrink-0"
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 shrink-0">
-                  <ImageIcon className="w-7 h-7" />
-                </div>
-              )}
-              <div className="flex-1">
-                <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition-colors">
-                  <Upload className="w-4 h-4 text-amber-400" />
-                  <span>Upload Photo</span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={handleOwnerImageUpload}
-                  />
-                </label>
-                <p className="text-[10px] text-slate-400 mt-1">JPG, PNG or WebP (Max 2 MB)</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Full Name *"
-              required
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-              placeholder="e.g. Vikram Sharma"
-            />
-            <Input
-              label="Contact Email *"
-              type="email"
-              required
-              value={contactEmail}
-              onChange={(e) => setContactEmail(e.target.value)}
-              placeholder="owner@example.com"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-1 gap-3">
-            <Input
-              label="Mobile Number *"
-              type="tel"
-              required
-              value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
-              placeholder="10 digit mobile"
-            />
-          </div>
-
-          {/* Owner Player #1 Cricket Fields — same as normal Player */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-            <SelectField
-              label="Cricket Role *"
-              value={ownerRole}
-              onChange={setOwnerRole}
-              options={CRICKET_ROLE_OPTIONS}
-            />
-            <SelectField
-              label="Batting Style *"
-              value={ownerBattingStyle}
-              onChange={setOwnerBattingStyle}
-              options={BATTING_STYLE_OPTIONS}
-            />
-            <SelectField
-              label="Bowling Style"
-              value={ownerBowlingStyle}
-              onChange={setOwnerBowlingStyle}
-              options={BOWLING_STYLE_OPTIONS}
-            />
-            <div>
-              <div className="flex items-center gap-1 mb-1">
-                <label className="text-[11px] font-medium text-slate-300 block">Jersey Size *</label>
-                <JerseyInfoTooltip />
-              </div>
-              <select
-                value={ownerJerseySize}
-                onChange={(e) => setOwnerJerseySize(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              >
-                {JERSEY_SIZE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
         </div>
 
-        {/* ============================================================
-            SECTION 2: TEAM DETAILS
-            ============================================================ */}
+        {/* SECTION 2: TEAM DETAILS */}
         <div className="p-4 bg-slate-900/80 border border-slate-700 rounded-2xl space-y-3">
-          <SectionHeader
-            icon={<Shield className="w-4 h-4 text-teal-400" />}
-            title="Team Details"
-            badgeColor="text-teal-400 bg-teal-950 border-teal-500/40"
-          />
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+            <span className="text-xs font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+              <Shield className="w-4 h-4 text-teal-400" />
+              Team Details
+            </span>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
@@ -492,69 +301,28 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
           </div>
         </div>
 
-        {/* ============================================================
-            SECTION 3: ICON / PLAYER #2
-            Always a new tournament-only player (is_tournament_only = TRUE,
-            auth_user_id = NULL). No existing player lookup or attachment.
-            ============================================================ */}
+        {/* SECTION 3: ICON PARTICIPANT DETAILS */}
         <div className="p-4 bg-slate-900/80 border border-slate-700 rounded-2xl space-y-3">
-          <SectionHeader
-            icon={<Star className="w-4 h-4 text-amber-400" />}
-            title={`Icon / Player #2${isIconRequired ? ' *' : ' (Optional)'}`}
+          <UnifiedParticipantForm
+            title="Icon / Player #2 Details *"
+            subtitle="Your nominated Icon player. A new tournament-only profile is created automatically."
             badge="Player Slot #2"
             badgeColor="text-emerald-400 bg-emerald-950 border-emerald-500/40"
+            initialData={iconData}
+            onChange={setIconData}
+            currentUserEmail={currentUser?.email}
+            photoRequired={true}
           />
-          <p className="text-[11px] text-slate-400 -mt-1 mb-2">
-            Your nominated Icon player. A new tournament-only profile is created automatically.
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label={`Icon Player Full Name${isIconRequired ? ' *' : ''}`}
-              required={isIconRequired}
-              value={iconPlayerName}
-              onChange={(e) => setIconPlayerName(e.target.value)}
-              placeholder="e.g. Rohit Sharma"
-            />
-            <Input
-              label="Icon Player Mobile Number"
-              type="tel"
-              value={iconPlayerMobile}
-              onChange={(e) => setIconPlayerMobile(e.target.value)}
-              placeholder="10 digit mobile"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-            <SelectField
-              label="Playing Role *"
-              value={iconPlayerRole}
-              onChange={setIconPlayerRole}
-              options={CRICKET_ROLE_OPTIONS}
-            />
-            <SelectField
-              label="Batting Style *"
-              value={iconPlayerBattingStyle}
-              onChange={setIconPlayerBattingStyle}
-              options={BATTING_STYLE_OPTIONS}
-            />
-            <SelectField
-              label="Bowling Style"
-              value={iconPlayerBowlingStyle}
-              onChange={setIconPlayerBowlingStyle}
-              options={BOWLING_STYLE_OPTIONS}
-            />
-          </div>
         </div>
 
-        {/* ============================================================
-            SECTION 4: PAYMENT
-            ============================================================ */}
+        {/* SECTION 4: PAYMENT OPTIONS */}
         <div className="p-4 bg-slate-900/80 border border-slate-700 rounded-2xl space-y-3">
-          <SectionHeader
-            icon={<Crown className="w-4 h-4 text-amber-400" />}
-            title="Payment Options"
-          />
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+            <span className="text-xs font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+              <Crown className="w-4 h-4 text-amber-400" />
+              Payment Options
+            </span>
+          </div>
 
           <div className="space-y-3">
             <label className="text-[11px] font-semibold text-slate-300 block">Select Payment Method *</label>

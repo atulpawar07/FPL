@@ -40,6 +40,7 @@ export interface Step1PersonalInput {
   dateOfBirth: string;
   city: string;
   profilePhotoPath?: string;
+  registrationFor?: 'SELF' | 'OTHER';
 }
 
 export interface Step2CricketInput {
