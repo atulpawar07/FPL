@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
       teamLogoBase64,
       // Payment
       paymentScreenshotBase64,
+      paymentMethod = 'UPI_QR',
       // Icon Player #2 fields (unchanged)
       iconPlayerName,
       iconPlayerMobile,
@@ -63,14 +64,34 @@ export async function POST(req: NextRequest) {
       .eq('auth_user_id', user.id)
       .maybeSingle();
 
-    if (profileErr || !playerProfile?.id) {
-      return NextResponse.json(
-        { error: 'You must complete your player profile before registering as a team owner.' },
-        { status: 400 }
-      );
-    }
+    let effectiveOwnerPlayerId = playerProfile?.id;
 
-    const effectiveOwnerPlayerId = playerProfile.id;
+    if (profileErr || !effectiveOwnerPlayerId) {
+      // Auto-create owner player profile if missing
+      const { data: newOwnerPlayer, error: createOwnerErr } = await createAdminClient()
+        .from('players')
+        .upsert({
+          auth_user_id: user.id,
+          full_name: ownerName.trim(),
+          email: contactEmail.toLowerCase().trim(),
+          mobile: contactPhone || null,
+          cricket_role: ownerRole || 'BATSMAN',
+          batting_style: ownerBattingStyle || 'RIGHT_HAND',
+          jersey_size: ownerJerseySize || 'M',
+          profile_image_url: ownerProfileImageUrl || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'auth_user_id' })
+        .select('id')
+        .single();
+
+      if (createOwnerErr || !newOwnerPlayer?.id) {
+        return NextResponse.json(
+          { error: 'You must complete your player profile before registering as a team owner.' },
+          { status: 400 }
+        );
+      }
+      effectiveOwnerPlayerId = newOwnerPlayer.id;
+    }
 
     const supabaseAdmin = createAdminClient();
 
@@ -108,12 +129,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Pre-validate Payment Screenshot File (if submitted)
+    // 3. Pre-validate Payment Screenshot File (if submitted and paymentMethod is UPI_QR)
     const screenshotBucket = 'payment-screenshots';
     let screenshotBuffer: Buffer | null = null;
     let screenshotValidation: any = null;
 
-    if (paymentScreenshotBase64) {
+    if (paymentScreenshotBase64 && paymentMethod !== 'ACKNOWLEDGE_BY_ORGANISER') {
       const cleanBase64 = paymentScreenshotBase64.replace(/^data:image\/\w+;base64,/, '');
       screenshotBuffer = Buffer.from(cleanBase64, 'base64');
       screenshotValidation = validateImageFileBuffer(screenshotBuffer);
@@ -133,9 +154,12 @@ export async function POST(req: NextRequest) {
     const effectiveOwnerJerseySize = ownerJerseySize?.trim() || 'M';
     const effectiveOwnerImageSnapshot = ownerProfileImageUrl?.trim() || null;
 
-    // 4. Call Atomic PostgreSQL RPC: allocate_owner_registration_v3
-    const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc(
-      'allocate_owner_registration_v3',
+    // 4. Call Atomic PostgreSQL RPC: allocate_owner_registration_v4 (with fallback to v3)
+    let rpcResult: any = null;
+    let rpcErr: any = null;
+
+    const rpcResV4 = await supabaseAdmin.rpc(
+      'allocate_owner_registration_v4',
       {
         p_tournament_id: tournamentId,
         p_owner_player_id: effectiveOwnerPlayerId,
@@ -143,28 +167,66 @@ export async function POST(req: NextRequest) {
         p_contact_email: contactEmail.toLowerCase().trim(),
         p_contact_phone: contactPhone || null,
         p_team_name: teamName?.trim() || `Team ${ownerName.trim()}`,
-        // Owner Player #1 complete snapshot (Gate 2A)
         p_owner_role: effectiveOwnerRole,
         p_owner_batting_style: effectiveOwnerBattingStyle,
         p_owner_bowling_style: effectiveOwnerBowlingStyle,
         p_owner_jersey_size: effectiveOwnerJerseySize,
         p_owner_image_snapshot: effectiveOwnerImageSnapshot,
-        // Team
         p_team_logo_url: effectiveTeamLogoUrl,
-        // Payment
         p_screenshot_bucket: screenshotBucket,
         p_screenshot_object_path: null,
-        // Icon Player #2 fields (unchanged from Gate 1)
         p_icon_name: iconPlayerName?.trim() || ownerName.trim(),
         p_icon_mobile: iconPlayerMobile || contactPhone || null,
         p_icon_role: iconPlayerRole || 'BATSMAN',
         p_icon_batting_style: iconPlayerBattingStyle || 'RIGHT_HAND',
         p_icon_bowling_style: iconPlayerBowlingStyle || null,
+        p_created_by_auth_id: user.id,
+        p_payment_method: paymentMethod || 'UPI_QR',
       }
     );
 
+    if (!rpcResV4.error && rpcResV4.data && rpcResV4.data.length > 0) {
+      rpcResult = rpcResV4.data;
+    } else {
+      const isMissingV4 =
+        rpcResV4.error?.code === '42883' ||
+        rpcResV4.error?.message?.includes('function allocate_owner_registration_v4') ||
+        rpcResV4.error?.message?.includes('does not exist');
+
+      if (isMissingV4) {
+        const rpcResV3 = await supabaseAdmin.rpc(
+          'allocate_owner_registration_v3',
+          {
+            p_tournament_id: tournamentId,
+            p_owner_player_id: effectiveOwnerPlayerId,
+            p_owner_name: ownerName.trim(),
+            p_contact_email: contactEmail.toLowerCase().trim(),
+            p_contact_phone: contactPhone || null,
+            p_team_name: teamName?.trim() || `Team ${ownerName.trim()}`,
+            p_owner_role: effectiveOwnerRole,
+            p_owner_batting_style: effectiveOwnerBattingStyle,
+            p_owner_bowling_style: effectiveOwnerBowlingStyle,
+            p_owner_jersey_size: effectiveOwnerJerseySize,
+            p_owner_image_snapshot: effectiveOwnerImageSnapshot,
+            p_team_logo_url: effectiveTeamLogoUrl,
+            p_screenshot_bucket: screenshotBucket,
+            p_screenshot_object_path: null,
+            p_icon_name: iconPlayerName?.trim() || ownerName.trim(),
+            p_icon_mobile: iconPlayerMobile || contactPhone || null,
+            p_icon_role: iconPlayerRole || 'BATSMAN',
+            p_icon_batting_style: iconPlayerBattingStyle || 'RIGHT_HAND',
+            p_icon_bowling_style: iconPlayerBowlingStyle || null,
+          }
+        );
+        rpcResult = rpcResV3.data;
+        rpcErr = rpcResV3.error;
+      } else {
+        rpcErr = rpcResV4.error;
+      }
+    }
+
     if (rpcErr || !rpcResult || rpcResult.length === 0) {
-      console.error('RPC Error allocate_owner_registration_v3:', rpcErr);
+      console.error('RPC Error allocate_owner_registration:', rpcErr);
       return NextResponse.json(
         { error: rpcErr?.message || 'Failed to allocate owner slot atomically' },
         { status: 400 }

@@ -27,6 +27,9 @@ import {
   Loader2,
   Eye,
   Trash2,
+  FileSpreadsheet,
+  Download,
+  MessageSquare,
 } from 'lucide-react';
 
 export default function SingleTournamentAdminPage({ params }: { params: Promise<{ id: string }> }) {
@@ -72,7 +75,7 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const handleApprovalAction = async (regId: string, action: 'APPROVE' | 'REJECT') => {
+  const handleApprovalAction = async (regId: string, action: 'APPROVE' | 'REJECT' | 'ACKNOWLEDGE_AND_APPROVE') => {
     setActionLoadingId(regId);
     setActionMessage(null);
     try {
@@ -92,6 +95,26 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
       setActionMessage('Network error updating registration');
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  const handleExportExcel = (scope: 'approved' | 'complete') => {
+    window.open(`/api/admin/export/excel?tournamentId=${tournamentId}&scope=${scope}`, '_blank');
+  };
+
+  const handleCopyWhatsApp = async () => {
+    try {
+      const res = await fetch(`/api/admin/export/whatsapp?tournamentId=${tournamentId}`);
+      const resData = await res.json();
+      if (res.ok && resData.text) {
+        await navigator.clipboard.writeText(resData.text);
+        setActionMessage('🎉 WhatsApp formatted text copied to clipboard!');
+        setTimeout(() => setActionMessage(null), 3000);
+      } else {
+        setActionMessage(`Error: ${resData.error || 'Failed to export WhatsApp text'}`);
+      }
+    } catch (err) {
+      setActionMessage('Failed to copy WhatsApp format to clipboard');
     }
   };
 
@@ -168,7 +191,15 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
     return nameMatch && statusMatch;
   });
 
-  const pendingApprovals = registrations.filter((r) => r.registration_status === 'WAITING_LIST' || r.status === 'PENDING' || !r.payment || r.payment?.payment_status === 'PENDING');
+  const pendingApprovals = registrations.filter(
+    (r) =>
+      r.registration_status === 'WAITING_LIST' ||
+      r.registration_status === 'PENDING' ||
+      r.status === 'PENDING' ||
+      !r.payment ||
+      r.payment?.payment_status === 'PENDING' ||
+      r.payment?.payment_status === 'AWAITING_ORGANISER_ACKNOWLEDGEMENT'
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-white">
@@ -189,7 +220,16 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
           </Button>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => handleExportExcel('approved')} leftIcon={<FileSpreadsheet className="w-4 h-4 text-emerald-400" />}>
+            Export Approved Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handleExportExcel('complete')} leftIcon={<Download className="w-4 h-4 text-teal-400" />}>
+            Export Complete List
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleCopyWhatsApp} leftIcon={<MessageSquare className="w-4 h-4 text-emerald-400" />}>
+            Copy WhatsApp
+          </Button>
           <Button variant="outline" size="sm" onClick={handleCopyLink} leftIcon={copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-emerald-400" />}>
             {copiedLink ? 'Link Copied' : 'Shareable Link'}
           </Button>
@@ -252,7 +292,7 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
             onClick={() => setActiveTab('approval')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors shrink-0 flex items-center gap-1.5 ${activeTab === 'approval' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}`}
           >
-            <span>Player Approval</span>
+            <span>Pending Reviews Queue</span>
             {pendingApprovals.length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-extrabold text-[10px]">
                 {pendingApprovals.length}
@@ -452,73 +492,112 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
         </Card>
       )}
 
-      {/* TAB CONTENT 3: APPROVAL QUEUE */}
+      {/* TAB CONTENT 3: UNIFIED PENDING REVIEWS QUEUE */}
       {activeTab === 'approval' && (
         <Card className="space-y-4">
           <div>
-            <h2 className="text-lg font-bold text-white">Player Approval Queue</h2>
+            <h2 className="text-lg font-bold text-white">Unified Pending Reviews Queue</h2>
             <p className="text-xs text-slate-400">
-              Approve player registrations and verify their payments. Approving a player confirms their squad spot.
+              Review and approve player & owner registrations. Supports both UPI payment proof verification and Organiser Payment Acknowledgements.
             </p>
           </div>
 
-          {registrations.length === 0 ? (
-            <p className="text-xs text-slate-500 italic p-6 text-center">No registrations to approve.</p>
+          {pendingApprovals.length === 0 ? (
+            <p className="text-xs text-slate-500 italic p-6 text-center">No pending registrations requiring review.</p>
           ) : (
             <div className="space-y-3">
-              {registrations.map((r) => (
-                <div key={r.id} className="p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={r.registered_image_snapshot || '/logo.png'}
-                      alt=""
-                      className="w-12 h-12 rounded-xl object-cover bg-slate-800 border border-slate-700"
-                    />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-white text-base">{r.registered_name_snapshot}</span>
-                        {r.registration_type === 'OWNER' ? (
-                          <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-2 py-0.5 rounded-full border border-amber-500/40">
-                            👑 Owner
-                          </span>
-                        ) : r.registration_type === 'ICON' ? (
-                          <span className="text-[10px] font-bold text-teal-300 bg-teal-950 px-2 py-0.5 rounded-full border border-teal-500/40">
-                            ⭐ Icon Player
-                          </span>
-                        ) : null}
-                        <Badge status={r.registration_status}>{r.registration_status}</Badge>
+              {pendingApprovals.map((r) => {
+                const isOrganiserAck =
+                  r.payment?.payment_method === 'ACKNOWLEDGE_BY_ORGANISER' ||
+                  r.payment?.payment_status === 'AWAITING_ORGANISER_ACKNOWLEDGEMENT';
+
+                return (
+                  <div key={r.id} className="p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={r.registered_image_snapshot || '/logo.png'}
+                        alt=""
+                        className="w-12 h-12 rounded-xl object-cover bg-slate-800 border border-slate-700 shrink-0"
+                      />
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-extrabold text-white text-base">{r.registered_name_snapshot}</span>
+                          {r.registration_type === 'OWNER' ? (
+                            <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-2 py-0.5 rounded-full border border-amber-500/40">
+                              👑 Owner
+                            </span>
+                          ) : r.registration_type === 'ICON' ? (
+                            <span className="text-[10px] font-bold text-teal-300 bg-teal-950 px-2 py-0.5 rounded-full border border-teal-500/40">
+                              ⭐ Icon Player
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800">
+                              🏏 Player
+                            </span>
+                          )}
+                          <Badge status={r.registration_status}>{r.registration_status}</Badge>
+                          {isOrganiserAck && (
+                            <span className="text-[10px] font-bold text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-500/50">
+                              🤝 Organiser Ack Requested
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Ref: <code className="text-emerald-400 font-bold">{r.registration_number}</code> | Role: {r.registered_role_snapshot} {r.team_name ? `| Team: ${r.team_name}` : ''}
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Email: {r.players?.email || 'N/A'} | Payment Status: <span className="font-bold text-amber-400">{r.payment?.payment_status || 'PENDING'}</span>
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Ref: <code className="text-emerald-400 font-bold">{r.registration_number}</code> | Role: {r.registered_role_snapshot} {r.team_name ? `| Team: ${r.team_name}` : ''}
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Email: {r.players?.email} | Payment: <span className="font-bold text-amber-400">{r.payment?.payment_status || 'PENDING'}</span>
-                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                      {r.payment?.payment_screenshot_url && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPreviewImageUrl(r.payment.payment_screenshot_url)}
+                          leftIcon={<Eye className="w-3.5 h-3.5 text-sky-400" />}
+                        >
+                          View Receipt
+                        </Button>
+                      )}
+
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        isLoading={actionLoadingId === r.id}
+                        onClick={() => handleApprovalAction(r.id, 'REJECT')}
+                        leftIcon={<XCircle className="w-4 h-4" />}
+                      >
+                        Reject
+                      </Button>
+
+                      {isOrganiserAck ? (
+                        <Button
+                          variant="gold"
+                          size="sm"
+                          isLoading={actionLoadingId === r.id}
+                          onClick={() => handleApprovalAction(r.id, 'ACKNOWLEDGE_AND_APPROVE')}
+                          leftIcon={<CheckCircle2 className="w-4 h-4 text-amber-950" />}
+                        >
+                          Acknowledge & Approve
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          isLoading={actionLoadingId === r.id}
+                          onClick={() => handleApprovalAction(r.id, 'APPROVE')}
+                          leftIcon={<CheckCircle2 className="w-4 h-4" />}
+                        >
+                          Approve & Confirm
+                        </Button>
+                      )}
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2 self-end sm:self-center">
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      isLoading={actionLoadingId === r.id}
-                      onClick={() => handleApprovalAction(r.id, 'REJECT')}
-                      leftIcon={<XCircle className="w-4 h-4" />}
-                    >
-                      Reject
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      isLoading={actionLoadingId === r.id}
-                      onClick={() => handleApprovalAction(r.id, 'APPROVE')}
-                      leftIcon={<CheckCircle2 className="w-4 h-4" />}
-                    >
-                      Approve & Confirm
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>

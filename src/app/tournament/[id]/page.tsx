@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/public/Header';
 import { Footer } from '@/components/public/Footer';
@@ -10,16 +10,19 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { JerseyInfoTooltip } from '@/components/ui/JerseyInfoTooltip';
 import { formatPaiseToINR, formatDate, cricketRoleLabels } from '@/lib/utils/format';
 import { DbTournament, CricketRole, BattingStyle, JerseySize } from '@/types';
-import { Trophy, Calendar, Users, ShieldAlert, CheckCircle2, ArrowRight, Upload, Image as ImageIcon, Lock, Crown, Clock } from 'lucide-react';
+import { Trophy, Calendar, Users, ShieldAlert, CheckCircle2, ArrowRight, Upload, Image as ImageIcon, Lock, Crown, Clock, UserCheck, UserPlus } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { TeamOwnerRegistrationModal } from '@/components/register/TeamOwnerRegistrationModal';
 
 export default function PublicTournamentPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const id = params?.id as string;
+  const regTypeParam = searchParams?.get('type');
   const supabase = createClient();
 
   const [tournament, setTournament] = useState<DbTournament | null>(null);
@@ -31,6 +34,9 @@ export default function PublicTournamentPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isOwnerModalOpen, setIsOwnerModalOpen] = useState(false);
 
+  // Registration Target: 'SELF' | 'OTHER'
+  const [regTarget, setRegTarget] = useState<'SELF' | 'OTHER'>('SELF');
+
   // Form State
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -40,10 +46,19 @@ export default function PublicTournamentPage() {
   const [jerseySize, setJerseySize] = useState<JerseySize>('M');
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // Field error states for dynamic validation
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   const [confirmedPlayers, setConfirmedPlayers] = useState<any[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (regTypeParam === 'owner') {
+      setIsOwnerModalOpen(true);
+    }
+  }, [regTypeParam]);
 
   useEffect(() => {
     if (!id) return;
@@ -95,6 +110,35 @@ export default function PublicTournamentPage() {
     });
   }, [id, supabase]);
 
+  const handleTargetChange = (target: 'SELF' | 'OTHER') => {
+    setRegTarget(target);
+    setFieldErrors({});
+    setErrorMsg(null);
+
+    if (target === 'OTHER') {
+      setFullName('');
+      setEmail('');
+      setProfileImageUrl('');
+      setCricketRole('BATSMAN');
+      setBattingStyle('RIGHT_HAND');
+      setJerseySize('M');
+    } else if (currentUser) {
+      setEmail(currentUser.email || '');
+      fetch('/api/players/profile')
+        .then((res) => res.json())
+        .then((pData) => {
+          if (pData.player) {
+            setFullName(pData.player.full_name || '');
+            setProfileImageUrl(pData.player.profile_image_url || '');
+            setCricketRole(pData.player.cricket_role || 'BATSMAN');
+            setBattingStyle(pData.player.batting_style || 'RIGHT_HAND');
+            setJerseySize(pData.player.jersey_size || 'M');
+          }
+        })
+        .catch(() => {});
+    }
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -113,6 +157,11 @@ export default function PublicTournamentPage() {
     reader.onloadend = () => {
       setProfileImageUrl(reader.result as string);
       setErrorMsg(null);
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.profileImageUrl;
+        return next;
+      });
     };
     reader.readAsDataURL(file);
   };
@@ -125,22 +174,58 @@ export default function PublicTournamentPage() {
       return;
     }
 
+    // Dynamic Mandatory Validation & Error Collection
+    const newErrors: Record<string, string> = {};
+    const firstMissingFieldIds: string[] = [];
+
+    if (!fullName || fullName.trim().length < 2) {
+      newErrors.fullName = 'Please enter player full name (at least 2 characters)';
+      firstMissingFieldIds.push('field-full-name');
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = 'Please enter a valid email address';
+      firstMissingFieldIds.push('field-email');
+    }
+
     if (!profileImageUrl) {
-      setErrorMsg('Please upload your profile photo to complete registration');
+      newErrors.profileImageUrl = 'Please upload a profile photo to complete registration';
+      firstMissingFieldIds.push('field-profile-image');
+    }
+
+    if (!termsAccepted) {
+      newErrors.termsAccepted = 'You must accept the terms and code of conduct to proceed';
+      firstMissingFieldIds.push('field-terms');
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setFieldErrors(newErrors);
+      setErrorMsg('Please complete all missing required fields highlighted below.');
+
+      // Auto-scroll and focus first missing field
+      if (firstMissingFieldIds.length > 0) {
+        setTimeout(() => {
+          const el = document.getElementById(firstMissingFieldIds[0]);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.focus();
+          }
+        }, 100);
+      }
       return;
     }
 
     setSubmitting(true);
     setErrorMsg(null);
-    setTermsAccepted(true);
 
     try {
       const res = await fetch(`/api/tournaments/${id}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fullName: fullName || email.split('@')[0],
-          email,
+          targetType: regTarget,
+          fullName: fullName.trim(),
+          email: email.trim().toLowerCase(),
           profileImageUrl,
           cricketRole,
           battingStyle,
@@ -327,12 +412,45 @@ export default function PublicTournamentPage() {
                   </div>
                 ) : (
                   <form onSubmit={handleRegisterSubmit} className="space-y-6">
+                    {/* TARGET SELECTOR: MYSELF VS ANOTHER PLAYER */}
+                    <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-2">
+                      <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                        Registering For:
+                      </label>
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleTargetChange('SELF')}
+                          className={`w-full sm:w-1/2 p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                            regTarget === 'SELF'
+                              ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow-md'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <UserCheck className="w-4 h-4 text-emerald-400" />
+                          <span>Myself (Use My Saved Profile)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleTargetChange('OTHER')}
+                          className={`w-full sm:w-1/2 p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                            regTarget === 'OTHER'
+                              ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow-md'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <UserPlus className="w-4 h-4 text-emerald-400" />
+                          <span>Another Player / Teammate</span>
+                        </button>
+                      </div>
+                    </div>
+
                     {/* 1st Field: Profile Image Upload / Preview */}
-                    <div className="space-y-2">
+                    <div id="field-profile-image" tabIndex={-1} className="space-y-2 outline-none">
                       <label className="text-xs sm:text-sm font-medium text-slate-300 block">
                         Profile Photo <span className="text-rose-400">*</span>
                       </label>
-                      <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-950/60 border border-dashed border-slate-700 rounded-2xl">
+                      <div className={`flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-950/60 border border-dashed rounded-2xl transition-colors ${fieldErrors.profileImageUrl ? 'border-rose-500 bg-rose-950/20' : 'border-slate-700'}`}>
                         {profileImageUrl ? (
                           <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-emerald-500 shrink-0">
                             <img src={profileImageUrl} alt="Player Photo" className="w-full h-full object-cover" />
@@ -356,32 +474,69 @@ export default function PublicTournamentPage() {
                           <p className="text-[11px] text-slate-400 mt-1">
                             Required: JPG, PNG or WebP (Max 2 MB)
                           </p>
+                          {fieldErrors.profileImageUrl && (
+                            <p className="text-xs text-rose-400 font-semibold mt-1">{fieldErrors.profileImageUrl}</p>
+                          )}
                         </div>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Full Name */}
-                      <Input
-                        label="Player Full Name"
-                        required
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="e.g. Rahul Patil"
-                        helperText="Extracted from account, fully editable"
-                      />
+                      <div>
+                        <div className="flex items-center mb-1">
+                          <label className="text-xs sm:text-sm font-medium text-slate-300 block">
+                            Player Full Name <span className="text-rose-400">*</span>
+                          </label>
+                          <JerseyInfoTooltip />
+                        </div>
+                        <input
+                          id="field-full-name"
+                          type="text"
+                          required
+                          value={fullName}
+                          onChange={(e) => {
+                            setFullName(e.target.value);
+                            if (fieldErrors.fullName) setFieldErrors((prev) => { const n = { ...prev }; delete n.fullName; return n; });
+                          }}
+                          placeholder="e.g. Rahul Patil"
+                          className={`w-full bg-slate-950 border text-slate-100 rounded-xl px-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 transition-colors ${fieldErrors.fullName ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-800'}`}
+                        />
+                        {fieldErrors.fullName && (
+                          <p className="text-xs text-rose-400 font-semibold mt-1">{fieldErrors.fullName}</p>
+                        )}
+                        <p className="text-[11px] text-slate-500 mt-1">Exact name printed on your tournament jersey</p>
+                      </div>
 
-                      {/* Email (Readonly) */}
-                      <Input
-                        label="Email Address"
-                        disabled
-                        value={email}
-                        helperText="Authenticated account email"
-                      />
+                      {/* Email Address */}
+                      <div>
+                        <label className="text-xs sm:text-sm font-medium text-slate-300 block mb-1">
+                          Email Address <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          id="field-email"
+                          type="email"
+                          required
+                          disabled={regTarget === 'SELF'}
+                          value={email}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (fieldErrors.email) setFieldErrors((prev) => { const n = { ...prev }; delete n.email; return n; });
+                          }}
+                          placeholder="player@example.com"
+                          className={`w-full bg-slate-950 border text-slate-100 rounded-xl px-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 transition-colors ${regTarget === 'SELF' ? 'opacity-75 cursor-not-allowed border-slate-800' : fieldErrors.email ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-800'}`}
+                        />
+                        {fieldErrors.email && (
+                          <p className="text-xs text-rose-400 font-semibold mt-1">{fieldErrors.email}</p>
+                        )}
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          {regTarget === 'SELF' ? 'Authenticated account email' : 'Participant contact email'}
+                        </p>
+                      </div>
 
                       {/* Cricket Role */}
                       <Select
-                        label="Cricket Role"
+                        label="Cricket Role *"
                         required
                         value={cricketRole}
                         onChange={(e) => setCricketRole(e.target.value as CricketRole)}

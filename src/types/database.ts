@@ -3,8 +3,9 @@ export type TournamentType = 'OWNER_BASED' | 'NON_OWNER_BASED';
 export type CricketRole = 'BATSMAN' | 'BOWLER' | 'ALL_ROUNDER' | 'BATSMAN_WICKETKEEPER' | 'BOWLER_WICKETKEEPER';
 export type BattingStyle = 'RIGHT_HAND' | 'LEFT_HAND';
 export type JerseySize = 'S' | 'M' | 'L' | 'XL' | 'XXL' | '3XL';
-export type RegistrationStatus = 'CONFIRMED' | 'WAITING_LIST' | 'CANCELLED';
-export type PaymentStatus = 'PENDING' | 'SUCCESSFUL' | 'FAILED' | 'REFUNDED';
+export type RegistrationStatus = 'CONFIRMED' | 'WAITING_LIST' | 'CANCELLED' | 'PENDING' | 'REJECTED';
+export type PaymentStatus = 'PENDING' | 'AWAITING_ORGANISER_ACKNOWLEDGEMENT' | 'SUCCESSFUL' | 'FAILED' | 'REFUNDED' | 'CREATED' | 'PROCESSING' | 'CANCELLED';
+export type PaymentMethod = 'UPI_QR' | 'UPI' | 'ACKNOWLEDGE_BY_ORGANISER' | 'MANUAL_MOCK';
 
 export interface DbProfile {
   id: string;
@@ -16,13 +17,15 @@ export interface DbProfile {
 
 export interface DbPlayer {
   id: string;
-  auth_user_id: string;
+  auth_user_id?: string | null;
   full_name: string;
-  email: string;
-  profile_image_url: string;
+  email?: string | null;
+  profile_image_url?: string | null;
   cricket_role: CricketRole;
-  batting_style: BattingStyle | null;
-  jersey_size: JerseySize | null;
+  batting_style?: BattingStyle | null;
+  jersey_size?: JerseySize | null;
+  is_tournament_only?: boolean;
+  player_type?: string;
   created_at: string;
   updated_at: string;
 }
@@ -64,7 +67,7 @@ export interface DbTeamOwner {
   slot_number: number;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   payment_status: PaymentStatus;
-  payment_screenshot_url: string | null;
+  payment_screenshot_url?: string | null;
   team_name?: string | null;
   team_logo_url?: string | null;
   owner_registration_id?: string | null;
@@ -76,6 +79,7 @@ export interface DbTeamOwner {
   icon_player_role?: string | null;
   icon_player_batting_style?: string | null;
   icon_player_bowling_style?: string | null;
+  created_by_auth_id?: string | null;
   registered_at: string;
 }
 
@@ -99,6 +103,7 @@ export interface DbRegistration {
   team_name?: string | null;
   team_owner_id?: string | null;
   waitlist_position: number | null;
+  created_by_auth_id?: string | null;
   registered_name_snapshot: string;
   registered_role_snapshot: CricketRole;
   registered_batting_style_snapshot: BattingStyle | null;
@@ -112,7 +117,7 @@ export interface DbPayment {
   id: string;
   registration_id: string;
   amount: number; // Integer in paise
-  payment_method: string;
+  payment_method: PaymentMethod | string;
   payment_status: PaymentStatus;
   transaction_reference: string | null;
   payment_screenshot_url?: string | null;

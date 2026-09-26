@@ -148,7 +148,7 @@ describe('API Route Security - /api/registrations', () => {
 
     await registerOwner(req);
 
-    expect(mockSupabaseAdmin.rpc).toHaveBeenCalledWith('allocate_owner_registration_v3', expect.objectContaining({
+    expect(mockSupabaseAdmin.rpc).toHaveBeenCalledWith('allocate_owner_registration_v4', expect.objectContaining({
       p_owner_player_id: 'my-player-123'
     }));
   });
