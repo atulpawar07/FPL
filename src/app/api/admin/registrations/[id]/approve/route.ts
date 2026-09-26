@@ -34,6 +34,9 @@ export async function POST(
     } else if (action === 'CANCEL') {
       newStatus = 'CANCELLED';
       newPaymentStatus = 'REFUNDED';
+    } else if (action === 'ACKNOWLEDGE_AND_APPROVE') {
+      newStatus = 'CONFIRMED';
+      newPaymentStatus = 'SUCCESSFUL';
     }
 
     // Update the target registration status
@@ -125,14 +128,14 @@ export async function POST(
       .eq('registration_id', registrationId)
       .maybeSingle();
 
-    const noteText = verificationNote || `${action === 'REJECT' ? 'Rejected' : 'Approved'} by ${role} (${user.email})`;
+    const noteText = verificationNote || `${action === 'REJECT' ? 'Rejected' : action === 'ACKNOWLEDGE_AND_APPROVE' ? 'Organiser Payment Acknowledged & Approved' : 'Approved'} by ${role} (${user.email})`;
 
     if (existingPayment) {
       await supabase
         .from('payments')
         .update({
           payment_status: newPaymentStatus,
-          transaction_reference: transactionReference || `${role}-ACTION-${Date.now()}`,
+          transaction_reference: transactionReference || `${role}-${action}-${Date.now()}`,
           verification_note: noteText,
           verified_by: user.email,
           verified_at: new Date().toISOString(),
@@ -145,7 +148,7 @@ export async function POST(
         amount: 50000,
         payment_method: 'UPI_QR',
         payment_status: newPaymentStatus,
-        transaction_reference: transactionReference || `${role}-ACTION-${Date.now()}`,
+        transaction_reference: transactionReference || `${role}-${action}-${Date.now()}`,
         verification_note: noteText,
         verified_by: user.email,
         verified_at: new Date().toISOString(),
@@ -157,9 +160,11 @@ export async function POST(
       ? ` (cascaded to linked Owner/Icon registrations)`
       : '';
 
+    const auditActionName = action === 'ACKNOWLEDGE_AND_APPROVE' ? 'ACKNOWLEDGE_ORGANISER_PAYMENT' : 'UPDATE_REGISTRATION_STATUS';
+
     await logAdminAction({
       adminUserId: user.id,
-      action: 'UPDATE_REGISTRATION_STATUS',
+      action: auditActionName,
       entityType: 'REGISTRATION',
       entityId: registrationId,
       oldValue: { registration_status: registration.registration_status },

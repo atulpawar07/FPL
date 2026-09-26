@@ -55,6 +55,8 @@ export const registrationStatusLabels: Record<RegistrationStatus, string> = {
   CONFIRMED: 'Confirmed Slot',
   WAITING_LIST: 'Waitlist',
   CANCELLED: 'Cancelled',
+  PENDING: 'Pending Review',
+  REJECTED: 'Rejected',
 };
 
 /**
@@ -65,4 +67,8 @@ export const paymentStatusLabels: Record<PaymentStatus, string> = {
   SUCCESSFUL: 'Successful (Paid)',
   FAILED: 'Failed',
   REFUNDED: 'Refunded',
+  AWAITING_ORGANISER_ACKNOWLEDGEMENT: 'Awaiting Organiser Ack',
+  CANCELLED: 'Cancelled',
+  CREATED: 'Created',
+  PROCESSING: 'Processing',
 };

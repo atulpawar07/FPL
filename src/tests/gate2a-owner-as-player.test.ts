@@ -97,6 +97,8 @@ describe('Gate 2A — Owner as Complete Player #1', () => {
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn(),
+      single: vi.fn().mockReturnThis(),
+      upsert: vi.fn().mockReturnThis(),
       rpc: vi.fn(),
     };
 
@@ -174,7 +176,7 @@ describe('Gate 2A — Owner as Complete Player #1', () => {
     );
 
     expect(mockAdmin.rpc).toHaveBeenCalledWith(
-      'allocate_owner_registration_v3',
+      'allocate_owner_registration_v4',
       expect.objectContaining({
         p_owner_role: 'ALL_ROUNDER',
         p_owner_batting_style: 'LEFT_HAND',
@@ -237,10 +239,10 @@ describe('Gate 2A — Owner as Complete Player #1', () => {
 
     await registerOwner(createOwnerRequest(VALID_OWNER_BODY));
 
-    // Only 1 RPC call was made (to allocate_owner_registration_v3)
+    // Only 1 RPC call was made (to allocate_owner_registration_v4)
     // No separate update to the players profile table
     expect(mockAdmin.rpc).toHaveBeenCalledTimes(1);
-    expect(mockAdmin.rpc.mock.calls[0][0]).toBe('allocate_owner_registration_v3');
+    expect(mockAdmin.rpc.mock.calls[0][0]).toBe('allocate_owner_registration_v4');
 
     // Server Supabase client: only called for auth + profile lookup (SELECT, not UPDATE)
     // The from() chain on mockServer is for SELECT only — verifying no mutating calls
@@ -504,7 +506,7 @@ describe('Gate 2A — Owner as Complete Player #1', () => {
 
     // Only 1 RPC call — no SMS/OTP external calls
     expect(mockAdmin.rpc).toHaveBeenCalledTimes(1);
-    expect(mockAdmin.rpc.mock.calls[0][0]).toBe('allocate_owner_registration_v3');
+    expect(mockAdmin.rpc.mock.calls[0][0]).toBe('allocate_owner_registration_v4');
   });
 
   // -------------------------------------------------------------------------

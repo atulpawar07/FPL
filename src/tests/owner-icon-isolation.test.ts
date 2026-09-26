@@ -68,7 +68,7 @@ describe('Owner Icon Isolation Security Tests', () => {
     const res = await registerOwner(req);
     expect(res.status).toBe(200);
 
-    expect(mockSupabaseAdmin.rpc).toHaveBeenCalledWith('allocate_owner_registration_v3', expect.objectContaining({
+    expect(mockSupabaseAdmin.rpc).toHaveBeenCalledWith('allocate_owner_registration_v4', expect.objectContaining({
       p_owner_player_id: 'owner-player-123',
       p_icon_name: 'Icon Player',
       p_icon_mobile: '9999999999',

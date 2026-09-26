@@ -170,7 +170,7 @@ function HomePageContent() {
 
                     return (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Link href={`/tournament/${activeTournament.id}`} className="w-full">
+                        <Link href={`/tournament/${activeTournament.id}?type=player`} className="w-full">
                           <Button size="lg" className="w-full shadow-lg shadow-emerald-950/60" leftIcon={<UserCheck className="w-5 h-5" />}>
                             Register as Player ({feeDisplay})
                           </Button>
@@ -251,7 +251,7 @@ function HomePageContent() {
 
                     return (
                       <div className="flex flex-wrap items-center gap-3">
-                        <Link href={`/tournament/${activeTournament.id}`}>
+                        <Link href={`/tournament/${activeTournament.id}?type=player`}>
                           <Button size="lg" className="shadow-lg shadow-emerald-950/60" leftIcon={<UserCheck className="w-5 h-5" />}>
                             Register as Player ({feeDisplay})
                           </Button>
