@@ -7,6 +7,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { DeleteTournamentModal } from '@/components/admin/DeleteTournamentModal';
+import { useRouter } from 'next/navigation';
 import { formatPaiseToINR, formatDate } from '@/lib/utils/format';
 import {
   Users,
@@ -30,10 +32,12 @@ import {
 export default function SingleTournamentAdminPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: tournamentId } = use(params);
 
+  const router = useRouter();
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'registrations' | 'approval' | 'owners' | 'payments'>('overview');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -194,6 +198,9 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
               Public View
             </Button>
           </Link>
+          <Button variant="danger" size="sm" onClick={() => setIsDeleteModalOpen(true)} leftIcon={<Trash2 className="w-3.5 h-3.5" />}>
+            Delete Tournament
+          </Button>
         </div>
       </div>
 
@@ -699,6 +706,16 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
           </div>
         </Modal>
       )}
+
+      {/* DELETE TOURNAMENT CONFIRMATION MODAL */}
+      <DeleteTournamentModal
+        isOpen={isDeleteModalOpen}
+        tournament={tournament}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onDeleted={() => {
+          router.push('/admin');
+        }}
+      />
     </div>
   );
 }

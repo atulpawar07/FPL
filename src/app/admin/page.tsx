@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
+import { DeleteTournamentModal } from '@/components/admin/DeleteTournamentModal';
 import { formatPaiseToINR, formatDate } from '@/lib/utils/format';
 import { DbTournament, TournamentType } from '@/types';
 import {
@@ -47,6 +48,15 @@ export default function AdminDashboardPage() {
   // Tournament Create/Edit Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTournament, setEditingTournament] = useState<DbTournament | null>(null);
+
+  // Tournament Delete Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingTournament, setDeletingTournament] = useState<DbTournament | null>(null);
+
+  const handleOpenDelete = (t: DbTournament) => {
+    setDeletingTournament(t);
+    setIsDeleteModalOpen(true);
+  };
 
   const [tName, setTName] = useState('');
   const [tDescription, setTDescription] = useState('');
@@ -385,13 +395,22 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => handleOpenEdit(t)}
-                    className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1"
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                    <span>Edit</span>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenEdit(t)}
+                      className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={() => handleOpenDelete(t)}
+                      className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
+                  </div>
 
                   <Link href={`/admin/tournament/${t.id}`}>
                     <Button variant="primary" size="sm" rightIcon={<ChevronRight className="w-4 h-4" />}>
@@ -763,6 +782,19 @@ export default function AdminDashboardPage() {
           </div>
         </form>
       </Modal>
+
+      {/* DELETE TOURNAMENT CONFIRMATION MODAL */}
+      <DeleteTournamentModal
+        isOpen={isDeleteModalOpen}
+        tournament={deletingTournament}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingTournament(null);
+        }}
+        onDeleted={() => {
+          fetchDashboard();
+        }}
+      />
     </div>
   );
 }
