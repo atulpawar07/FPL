@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { playerProfileSchema } from '@/lib/validation/registration';
+import { uploadToStorageBucket, validateImageFileBuffer } from '@/lib/storage/upload';
 
 export async function GET() {
   try {
@@ -99,12 +100,44 @@ export async function POST(req: NextRequest) {
     const data = validationResult.data;
     const supabaseAdmin = createAdminClient();
 
+    // Handle Profile Image Upload (Base64 / Storage upload)
+    let effectiveProfileImageUrl = data.profileImageUrl;
+    const isBase64 = data.profileImageUrl && data.profileImageUrl.startsWith('data:image/');
+    const isExternalUrl = data.profileImageUrl && (data.profileImageUrl.startsWith('http://') || data.profileImageUrl.startsWith('https://'));
+
+    if (isExternalUrl && !isBase64) {
+      return NextResponse.json(
+        { error: 'Arbitrary external profile image URLs are not allowed. Please upload an image file (JPEG, PNG, WebP).' },
+        { status: 400 }
+      );
+    }
+
+    if (isBase64) {
+      const cleanBase64 = data.profileImageUrl.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      const validation = validateImageFileBuffer(buffer);
+
+      if (!validation.isValid || !validation.mimeType) {
+        return NextResponse.json({ error: validation.error || 'Invalid profile image file format' }, { status: 400 });
+      }
+
+      const ext = validation.mimeType === 'image/jpeg' ? 'jpg' : validation.mimeType === 'image/webp' ? 'webp' : 'png';
+      const objectPath = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
+
+      try {
+        const uploadResult = await uploadToStorageBucket('profile-images', objectPath, buffer, validation.mimeType);
+        effectiveProfileImageUrl = uploadResult.publicUrl || objectPath;
+      } catch (uploadErr: any) {
+        return NextResponse.json({ error: uploadErr.message || 'Failed to upload profile image' }, { status: 400 });
+      }
+    }
+
     // Upsert player profile with fallback if jersey_size or auth_user_id column is missing on remote DB
     const playerPayload: any = {
       auth_user_id: user.id,
       full_name: data.fullName,
       email: user.email!,
-      profile_image_url: data.profileImageUrl,
+      profile_image_url: effectiveProfileImageUrl,
       cricket_role: data.cricketRole,
       batting_style: data.battingStyle || null,
       jersey_size: data.jerseySize || null,

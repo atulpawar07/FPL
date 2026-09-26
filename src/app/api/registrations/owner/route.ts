@@ -1,481 +1,215 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { uploadToStorageBucket, validateImageFileBuffer } from '@/lib/storage/upload';
 
 export async function POST(req: NextRequest) {
   try {
+    const supabaseServer = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     const body = await req.json();
+
+    // -------------------------------------------------------
+    // Gate 2A: Owner as Complete Player #1
+    // Destructure complete Owner Player #1 snapshot fields.
+    // Client-supplied ownerPlayerId / playerId is IGNORED —
+    // the authenticated user's player profile is always resolved
+    // server-side from the session.
+    // -------------------------------------------------------
     const {
       tournamentId,
+      // Owner identity (contact / team)
       ownerName,
       contactEmail,
       contactPhone,
-      playerId,
-      paymentScreenshotUrl,
+      // Owner Player #1 complete snapshot fields
+      ownerRole,
+      ownerBattingStyle,
+      ownerBowlingStyle,
+      ownerJerseySize,
+      ownerProfileImageUrl,
+      // Team
       teamName,
       teamLogoUrl,
+      teamLogoBase64,
+      // Payment
+      paymentScreenshotBase64,
+      // Icon Player #2 fields (unchanged)
       iconPlayerName,
       iconPlayerMobile,
       iconPlayerRole,
       iconPlayerBattingStyle,
-      iconPlayerJerseySize,
-      ownerIsPlaying,
-      ownerCricketRole,
-      ownerTshirtSize,
-      ownerTrouserSize,
+      iconPlayerBowlingStyle,
+      // iconExistingPlayerId is intentionally NOT destructured — always dropped.
     } = body;
 
     if (!tournamentId || !ownerName || !contactEmail) {
-      return NextResponse.json({ error: 'Tournament ID, Owner Name, and Contact Email are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Tournament ID, Owner Name, and Contact Email are required' },
+        { status: 400 }
+      );
     }
 
-    const supabase = createAdminClient();
-
-    // ─── 1. FETCH & VALIDATE TOURNAMENT ──────────────────────────────────────
-    const { data: tournament, error: tErr } = await supabase
-      .from('tournaments')
-      .select('*')
-      .eq('id', tournamentId)
+    // 1. Resolve Owner Player Record from Authenticated Session ONLY
+    //    Client-supplied playerId / ownerPlayerId values are NEVER trusted.
+    const { data: playerProfile, error: profileErr } = await supabaseServer
+      .from('players')
+      .select('id')
+      .eq('auth_user_id', user.id)
       .maybeSingle();
 
-    if (tErr) {
-      console.error('Fetch tournament error in owner registration:', tErr);
-      return NextResponse.json({ error: `Database error: ${tErr.message}` }, { status: 500 });
+    if (profileErr || !playerProfile?.id) {
+      return NextResponse.json(
+        { error: 'You must complete your player profile before registering as a team owner.' },
+        { status: 400 }
+      );
     }
 
-    if (!tournament) {
-      return NextResponse.json({ error: 'Tournament not found' }, { status: 404 });
+    const effectiveOwnerPlayerId = playerProfile.id;
+
+    const supabaseAdmin = createAdminClient();
+
+    // 2. Handle Team Logo File Upload (Reject arbitrary external URLs)
+    let effectiveTeamLogoUrl: string | null = null;
+    const logoInput = teamLogoBase64 || (teamLogoUrl && teamLogoUrl.startsWith('data:image/') ? teamLogoUrl : null);
+
+    if (teamLogoUrl && (teamLogoUrl.startsWith('http://') || teamLogoUrl.startsWith('https://')) && !teamLogoBase64) {
+      return NextResponse.json(
+        { error: 'Arbitrary external team logo URLs are not allowed. Please upload an image file (JPEG, PNG, WebP).' },
+        { status: 400 }
+      );
     }
 
-    if (tournament.tournament_type !== 'OWNER_BASED') {
-      return NextResponse.json({ error: 'This tournament does not accept team owner registrations' }, { status: 400 });
-    }
+    if (logoInput) {
+      const cleanLogoBase64 = logoInput.replace(/^data:image\/\w+;base64,/, '');
+      const logoBuffer = Buffer.from(cleanLogoBase64, 'base64');
+      const logoValidation = validateImageFileBuffer(logoBuffer);
 
-    const isIconEnabled = tournament.icon_player_enabled !== false;
-
-    if (isIconEnabled && !iconPlayerName?.trim()) {
-      return NextResponse.json({ error: 'Icon Player Name is required for this tournament' }, { status: 400 });
-    }
-
-    // ─── 2. RESOLVE / CREATE OWNER PLAYER PROFILE ────────────────────────────
-    let effectiveOwnerPlayerId: string | null = null;
-    const emailClean = contactEmail.toLowerCase().trim();
-
-    // 2a. Check if supplied playerId exists
-    if (playerId) {
-      const { data: pById } = await supabase
-        .from('players')
-        .select('id')
-        .or(`id.eq.${playerId},auth_user_id.eq.${playerId}`)
-        .maybeSingle();
-
-      if (pById?.id) {
-        effectiveOwnerPlayerId = pById.id;
+      if (!logoValidation.isValid || !logoValidation.mimeType) {
+        return NextResponse.json(
+          { error: logoValidation.error || 'Invalid team logo file format' },
+          { status: 400 }
+        );
       }
-    }
 
-    // 2b. Lookup by email
-    if (!effectiveOwnerPlayerId) {
-      const { data: pByEmail } = await supabase
-        .from('players')
-        .select('id')
-        .eq('email', emailClean)
-        .maybeSingle();
+      const logoExt = logoValidation.mimeType === 'image/jpeg' ? 'jpg' : logoValidation.mimeType === 'image/webp' ? 'webp' : 'png';
+      const logoPath = `${tournamentId}/${effectiveOwnerPlayerId}/${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${logoExt}`;
 
-      if (pByEmail?.id) {
-        effectiveOwnerPlayerId = pByEmail.id;
-      }
-    }
-
-    // 2c. Create new player profile for the owner
-    if (!effectiveOwnerPlayerId) {
-      // Try to find/create auth user for the owner
-      let authUserId: string | null = null;
       try {
-        const { data: usersData } = await supabase.auth.admin.listUsers();
-        const existingUser = usersData?.users?.find((u) => u.email?.toLowerCase() === emailClean);
-        if (existingUser) {
-          authUserId = existingUser.id;
-        } else {
-          const { data: newUser } = await supabase.auth.admin.createUser({
-            email: emailClean,
-            email_confirm: true,
-            user_metadata: { full_name: ownerName.trim() },
-          });
-          authUserId = newUser?.user?.id || null;
+        const logoUpload = await uploadToStorageBucket('team-logos', logoPath, logoBuffer, logoValidation.mimeType);
+        effectiveTeamLogoUrl = logoUpload.publicUrl || logoPath;
+      } catch (uploadErr: any) {
+        return NextResponse.json({ error: uploadErr.message || 'Failed to upload team logo' }, { status: 400 });
+      }
+    }
+
+    // 3. Pre-validate Payment Screenshot File (if submitted)
+    const screenshotBucket = 'payment-screenshots';
+    let screenshotBuffer: Buffer | null = null;
+    let screenshotValidation: any = null;
+
+    if (paymentScreenshotBase64) {
+      const cleanBase64 = paymentScreenshotBase64.replace(/^data:image\/\w+;base64,/, '');
+      screenshotBuffer = Buffer.from(cleanBase64, 'base64');
+      screenshotValidation = validateImageFileBuffer(screenshotBuffer);
+
+      if (!screenshotValidation.isValid || !screenshotValidation.mimeType || !screenshotValidation.extension) {
+        return NextResponse.json(
+          { error: screenshotValidation.error || 'Invalid payment screenshot file format' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Normalise Owner Player #1 snapshot fields with same defaults as normal Player registration
+    const effectiveOwnerRole = ownerRole?.trim() || 'BATSMAN';
+    const effectiveOwnerBattingStyle = ownerBattingStyle?.trim() || 'RIGHT_HAND';
+    const effectiveOwnerBowlingStyle = ownerBowlingStyle?.trim() || null;
+    const effectiveOwnerJerseySize = ownerJerseySize?.trim() || 'M';
+    const effectiveOwnerImageSnapshot = ownerProfileImageUrl?.trim() || null;
+
+    // 4. Call Atomic PostgreSQL RPC: allocate_owner_registration_v3
+    const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc(
+      'allocate_owner_registration_v3',
+      {
+        p_tournament_id: tournamentId,
+        p_owner_player_id: effectiveOwnerPlayerId,
+        p_owner_name: ownerName.trim(),
+        p_contact_email: contactEmail.toLowerCase().trim(),
+        p_contact_phone: contactPhone || null,
+        p_team_name: teamName?.trim() || `Team ${ownerName.trim()}`,
+        // Owner Player #1 complete snapshot (Gate 2A)
+        p_owner_role: effectiveOwnerRole,
+        p_owner_batting_style: effectiveOwnerBattingStyle,
+        p_owner_bowling_style: effectiveOwnerBowlingStyle,
+        p_owner_jersey_size: effectiveOwnerJerseySize,
+        p_owner_image_snapshot: effectiveOwnerImageSnapshot,
+        // Team
+        p_team_logo_url: effectiveTeamLogoUrl,
+        // Payment
+        p_screenshot_bucket: screenshotBucket,
+        p_screenshot_object_path: null,
+        // Icon Player #2 fields (unchanged from Gate 1)
+        p_icon_name: iconPlayerName?.trim() || ownerName.trim(),
+        p_icon_mobile: iconPlayerMobile || contactPhone || null,
+        p_icon_role: iconPlayerRole || 'BATSMAN',
+        p_icon_batting_style: iconPlayerBattingStyle || 'RIGHT_HAND',
+        p_icon_bowling_style: iconPlayerBowlingStyle || null,
+      }
+    );
+
+    if (rpcErr || !rpcResult || rpcResult.length === 0) {
+      console.error('RPC Error allocate_owner_registration_v3:', rpcErr);
+      return NextResponse.json(
+        { error: rpcErr?.message || 'Failed to allocate owner slot atomically' },
+        { status: 400 }
+      );
+    }
+
+    const result = rpcResult[0];
+    const ownerRegistrationId = result.owner_registration_id;
+
+    // 5. Upload Payment Screenshot to Storage using canonical ownerRegistrationId path
+    let screenshotObjectPath: string | null = null;
+    if (screenshotBuffer && screenshotValidation) {
+      const ext = screenshotValidation.extension;
+      const filename = `${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
+      screenshotObjectPath = `${tournamentId}/${ownerRegistrationId}/${filename}`;
+
+      try {
+        await uploadToStorageBucket(screenshotBucket, screenshotObjectPath, screenshotBuffer, screenshotValidation.mimeType);
+
+        if (result.payment_id) {
+          await supabaseAdmin
+            .from('payments')
+            .update({
+              screenshot_bucket: screenshotBucket,
+              screenshot_object_path: screenshotObjectPath,
+            })
+            .eq('id', result.payment_id);
         }
-      } catch (e) {
-        console.warn('Auth user creation warning in owner route:', e);
-      }
-
-      // Insert owner player record — use minimal columns that we know exist
-      const ownerPlayerPayload: Record<string, any> = {
-        full_name: ownerName.trim(),
-        email: emailClean,
-        profile_image_url: teamLogoUrl || paymentScreenshotUrl || '/logo.png',
-        cricket_role: ownerCricketRole || 'ALL_ROUNDER',
-      };
-
-      // Only set auth_user_id if we have one
-      if (authUserId) {
-        ownerPlayerPayload.auth_user_id = authUserId;
-      }
-
-      let { data: createdPlayer, error: pInsErr } = await supabase
-        .from('players')
-        .insert(ownerPlayerPayload)
-        .select('id')
-        .maybeSingle();
-
-      // Fallback: try without optional columns
-      if (pInsErr) {
-        console.warn('First owner player insert attempt failed:', pInsErr.message);
-        const minimalPayload: Record<string, any> = {
-          full_name: ownerName.trim(),
-          email: emailClean,
-        };
-        if (authUserId) minimalPayload.auth_user_id = authUserId;
-
-        const fallbackRes = await supabase
-          .from('players')
-          .insert(minimalPayload)
-          .select('id')
-          .maybeSingle();
-
-        if (fallbackRes.data?.id) {
-          createdPlayer = fallbackRes.data;
-        } else {
-          console.error('Fallback owner player insert also failed:', fallbackRes.error?.message);
-        }
-      }
-
-      if (createdPlayer?.id) {
-        effectiveOwnerPlayerId = createdPlayer.id;
+      } catch (uploadErr: any) {
+        console.error('Failed to upload owner payment screenshot:', uploadErr);
       }
     }
 
-    if (!effectiveOwnerPlayerId) {
-      return NextResponse.json({
-        error: 'Failed to create or resolve player profile for owner registration. Please try again.',
-      }, { status: 500 });
-    }
-
-    // ─── 3. DUPLICATE PREVENTION ─────────────────────────────────────────────
-    const { data: existingOwnerReg } = await supabase
-      .from('registrations')
-      .select('id')
-      .eq('tournament_id', tournamentId)
-      .eq('player_id', effectiveOwnerPlayerId)
-      .in('registration_type', ['OWNER', 'ICON'])
-      .maybeSingle();
-
-    if (existingOwnerReg) {
-      return NextResponse.json({
-        error: 'You are already registered as an Owner or Icon player for this tournament.',
-      }, { status: 400 });
-    }
-
-    const { data: existingOwner } = await supabase
-      .from('team_owners')
-      .select('id')
-      .eq('tournament_id', tournamentId)
-      .eq('contact_email', emailClean)
-      .maybeSingle();
-
-    if (existingOwner) {
-      return NextResponse.json({
-        error: 'An owner with this email is already registered for this tournament.',
-      }, { status: 400 });
-    }
-
-    // ─── 4. CAPACITY VALIDATION ──────────────────────────────────────────────
-    // Owner registration consumes: 1 owner/team slot + 2 player slots (Owner + Icon)
-
-    const { count: currentOwnersCount } = await supabase
-      .from('team_owners')
-      .select('id', { count: 'exact', head: true })
-      .eq('tournament_id', tournamentId);
-
-    const maxTeams = tournament.max_teams || 8;
-    if ((currentOwnersCount || 0) >= maxTeams) {
-      return NextResponse.json({
-        error: `All ${maxTeams} team owner slots for this tournament are already filled.`,
-      }, { status: 400 });
-    }
-
-    const { count: currentPlayerCount } = await supabase
-      .from('registrations')
-      .select('id', { count: 'exact', head: true })
-      .eq('tournament_id', tournamentId)
-      .in('registration_status', ['CONFIRMED', 'PENDING']);
-
-    const maxPlayers = tournament.max_players || 100;
-    const playerSlotsNeeded = 2; // Owner (as player) + Icon player
-    const currentPlayers = currentPlayerCount || 0;
-    const availablePlayerSlots = maxPlayers - currentPlayers;
-
-    if (availablePlayerSlots < playerSlotsNeeded) {
-      return NextResponse.json({
-        error: `Insufficient player capacity. Owner registration requires ${playerSlotsNeeded} player slots (Owner + Icon), but only ${Math.max(0, availablePlayerSlots)} remain out of ${maxPlayers}.`,
-      }, { status: 400 });
-    }
-
-    // ─── 5. BEGIN INSERTS ────────────────────────────────────────────────────
-    const nextSlot = (currentOwnersCount || 0) + 1;
-    const finalTeamName = teamName?.trim() || `Team ${ownerName.trim()}`;
-
-    // 5a. Insert Team Owner Record
-    const ownerPayload: Record<string, any> = {
-      tournament_id: tournamentId,
-      player_id: effectiveOwnerPlayerId,
-      team_name: finalTeamName,
-      team_logo_url: teamLogoUrl || null,
-      owner_name: ownerName.trim(),
-      contact_email: emailClean,
-      contact_phone: contactPhone || null,
-      slot_number: nextSlot,
-      status: 'PENDING',
-      payment_status: 'PENDING',
-      payment_screenshot_url: paymentScreenshotUrl || null,
-      owner_is_playing: ownerIsPlaying !== false,
-      owner_cricket_role: ownerCricketRole || 'BATSMAN',
-      icon_player_name: iconPlayerName?.trim() || ownerName.trim(),
-      icon_player_mobile: iconPlayerMobile || contactPhone || null,
-      icon_player_role: iconPlayerRole || ownerCricketRole || 'BATSMAN',
-      icon_player_batting_style: iconPlayerBattingStyle || 'RIGHT_HAND',
-    };
-
-    let { data: newOwner, error: ownerInsertErr } = await supabase
-      .from('team_owners')
-      .insert(ownerPayload)
-      .select()
-      .single();
-
-    // Fallback: strip newer columns if DB doesn't have them yet
-    if (ownerInsertErr && ownerInsertErr.message?.includes('column')) {
-      const corePayload: Record<string, any> = {
-        tournament_id: tournamentId,
-        player_id: effectiveOwnerPlayerId,
-        owner_name: ownerName.trim(),
-        contact_email: emailClean,
-        contact_phone: contactPhone || null,
-        slot_number: nextSlot,
-        status: 'PENDING',
-        payment_status: 'PENDING',
-        payment_screenshot_url: paymentScreenshotUrl || null,
-      };
-      const fb = await supabase.from('team_owners').insert(corePayload).select().single();
-      newOwner = fb.data;
-      ownerInsertErr = fb.error;
-    }
-
-    if (ownerInsertErr || !newOwner) {
-      console.error('Team Owner insert error:', ownerInsertErr);
-      return NextResponse.json({
-        error: ownerInsertErr?.message || 'Failed to insert team owner record',
-      }, { status: 500 });
-    }
-
-    // 5b. Create OWNER Registration record (1 player slot)
-    let ownerRegistrationId: string | null = null;
-    {
-      const ownerRegRef = 'OWNER-REG-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-      const ownerRegPayload: Record<string, any> = {
-        tournament_id: tournamentId,
-        player_id: effectiveOwnerPlayerId,
-        registration_number: ownerRegRef,
-        registration_reference: ownerRegRef,
-        status: 'PENDING',
-        registration_status: 'PENDING',
-        registration_type: 'OWNER',
-        team_name: finalTeamName,
-        team_owner_id: newOwner.id,
-        registered_name_snapshot: ownerName.trim(),
-        registered_role_snapshot: ownerCricketRole || 'ALL_ROUNDER',
-        registered_image_snapshot: teamLogoUrl || paymentScreenshotUrl || '/logo.png',
-        registered_at: new Date().toISOString(),
-      };
-
-      let { data: ownerRegData, error: ownerRegErr } = await supabase
-        .from('registrations')
-        .insert(ownerRegPayload)
-        .select('id')
-        .single();
-
-      if (ownerRegErr) {
-        console.warn('Owner registration insert failed, trying fallback:', ownerRegErr.message);
-        // Strip columns that may not exist
-        const fallbackPayload: Record<string, any> = {
-          tournament_id: tournamentId,
-          player_id: effectiveOwnerPlayerId,
-          registration_number: ownerRegRef,
-          registration_status: 'PENDING',
-          registered_name_snapshot: ownerName.trim(),
-          registered_role_snapshot: ownerCricketRole || 'ALL_ROUNDER',
-          registered_image_snapshot: teamLogoUrl || paymentScreenshotUrl || '/logo.png',
-          registered_at: new Date().toISOString(),
-        };
-        const fb = await supabase.from('registrations').insert(fallbackPayload).select('id').single();
-        ownerRegData = fb.data;
-        ownerRegErr = fb.error;
-      }
-
-      if (ownerRegErr) {
-        console.error('Owner registration insert failed completely:', ownerRegErr.message);
-      } else {
-        ownerRegistrationId = ownerRegData?.id || null;
-        // Create payment record for owner with total clubbed fee (Owner Fee + Player Fee)
-        if (ownerRegistrationId && paymentScreenshotUrl) {
-          try {
-            const ownerFeePaise = tournament.owner_registration_fee || 900000;
-            const playerFeePaise = tournament.registration_fee || 90000;
-            const totalClubbedFeePaise = body.clubbedAmountPaise || (ownerFeePaise + playerFeePaise);
-
-            await supabase.from('payments').insert({
-              registration_id: ownerRegistrationId,
-              amount: totalClubbedFeePaise,
-              payment_method: 'UPI_QR',
-              payment_status: 'PENDING',
-              payment_screenshot_url: paymentScreenshotUrl,
-              transaction_reference: 'OWNER-PAY-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-              created_at: new Date().toISOString(),
-            });
-          } catch (pErr) {
-            console.error('Owner payment insert error:', pErr);
-          }
-        }
-      }
-    }
-
-    // 5c. Create ICON Player Profile & Registration (1 more player slot)
-    let iconRegistrationId: string | null = null;
-    {
-      const targetIconName = iconPlayerName?.trim() || ownerName.trim();
-      let effectiveIconPlayerId: string | null = null;
-
-      // If icon player is different from owner, create a separate player profile
-      if (iconPlayerName?.trim() && iconPlayerName.trim().toLowerCase() !== ownerName.trim().toLowerCase()) {
-        const iconEmail = `icon-${nextSlot}-${Date.now()}@fairplay.local`;
-
-        // Insert icon player — NO auth_user_id needed, NO registration_reference
-        const iconPlayerPayload: Record<string, any> = {
-          full_name: targetIconName,
-          email: iconEmail,
-          profile_image_url: '/logo.png',
-          cricket_role: iconPlayerRole || ownerCricketRole || 'ALL_ROUNDER',
-        };
-
-        // Try to add mobile if column exists
-        if (iconPlayerMobile) {
-          iconPlayerPayload.mobile = iconPlayerMobile;
-        }
-
-        let { data: iconPlayer, error: iconPlayerErr } = await supabase
-          .from('players')
-          .insert(iconPlayerPayload)
-          .select('id')
-          .single();
-
-        // Fallback: minimal insert
-        if (iconPlayerErr) {
-          console.warn('Icon player insert failed, trying minimal:', iconPlayerErr.message);
-          const minPayload: Record<string, any> = {
-            full_name: targetIconName,
-            email: iconEmail,
-          };
-          const fb = await supabase.from('players').insert(minPayload).select('id').single();
-          iconPlayer = fb.data;
-          iconPlayerErr = fb.error;
-          if (iconPlayerErr) {
-            console.error('Icon player minimal insert also failed:', iconPlayerErr.message);
-          }
-        }
-
-        effectiveIconPlayerId = iconPlayer?.id || null;
-      } else {
-        // Owner IS the icon player
-        effectiveIconPlayerId = effectiveOwnerPlayerId;
-      }
-
-      if (effectiveIconPlayerId) {
-        const iconRegRef = 'ICON-REG-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-        const iconRegPayload: Record<string, any> = {
-          tournament_id: tournamentId,
-          player_id: effectiveIconPlayerId,
-          registration_number: iconRegRef,
-          registration_reference: iconRegRef,
-          status: 'PENDING',
-          registration_status: 'PENDING',
-          registration_type: 'ICON',
-          team_name: finalTeamName,
-          team_owner_id: newOwner.id,
-          registered_name_snapshot: targetIconName,
-          registered_role_snapshot: iconPlayerRole || ownerCricketRole || 'BATSMAN',
-          registered_image_snapshot: '/logo.png',
-          registered_at: new Date().toISOString(),
-        };
-
-        let { data: iconRegData, error: iconRegErr } = await supabase
-          .from('registrations')
-          .insert(iconRegPayload)
-          .select('id')
-          .single();
-
-        if (iconRegErr) {
-          console.warn('Icon registration insert failed, trying fallback:', iconRegErr.message);
-          const fbPayload: Record<string, any> = {
-            tournament_id: tournamentId,
-            player_id: effectiveIconPlayerId,
-            registration_number: iconRegRef,
-            registration_status: 'PENDING',
-            registered_name_snapshot: targetIconName,
-            registered_role_snapshot: iconPlayerRole || ownerCricketRole || 'BATSMAN',
-            registered_image_snapshot: '/logo.png',
-            registered_at: new Date().toISOString(),
-          };
-          const fb = await supabase.from('registrations').insert(fbPayload).select('id').single();
-          iconRegData = fb.data;
-          iconRegErr = fb.error;
-          if (iconRegErr) {
-            console.error('Icon registration fallback also failed:', iconRegErr.message);
-          }
-        }
-
-        iconRegistrationId = iconRegData?.id || null;
-      }
-    }
-
-    // 5d. Link registration IDs back to team_owners record
-    if (ownerRegistrationId || iconRegistrationId) {
-      await supabase
-        .from('team_owners')
-        .update({
-          owner_registration_id: ownerRegistrationId,
-          icon_registration_id: iconRegistrationId,
-        })
-        .eq('id', newOwner.id);
-    }
-
-    // ─── 6. RESPOND WITH CAPACITY SUMMARY ────────────────────────────────────
     return NextResponse.json({
       success: true,
-      ownerId: newOwner.id,
-      slotNumber: nextSlot,
-      teamName: finalTeamName,
-      status: 'PENDING',
-      ownerRegistrationId,
-      iconRegistrationId,
-      capacitySummary: {
-        ownerSlotsUsed: nextSlot,
-        ownerSlotsTotal: maxTeams,
-        ownerSlotsRemaining: maxTeams - nextSlot,
-        playerSlotsUsed: currentPlayers + playerSlotsNeeded,
-        playerSlotsTotal: maxPlayers,
-        playerSlotsRemaining: maxPlayers - (currentPlayers + playerSlotsNeeded),
-      },
-      message: `Registered as Team Owner #${nextSlot} ("${finalTeamName}") successfully! Owner and Icon Player both registered (2 player slots consumed). Owner slots: ${nextSlot}/${maxTeams}, Player slots: ${currentPlayers + playerSlotsNeeded}/${maxPlayers}.`,
+      ownerId: result.owner_id,
+      slotNumber: result.slot_number,
+      ownerRegistrationId: result.owner_registration_id,
+      iconRegistrationId: result.icon_registration_id,
+      paymentId: result.payment_id,
+      status: result.status,
+      message: `Owner registration completed atomically! Slot #${result.slot_number} assigned.`,
     });
   } catch (err: any) {
-    console.error('Owner Registration error:', err);
+    console.error('Owner Registration Endpoint Error:', err);
     return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }

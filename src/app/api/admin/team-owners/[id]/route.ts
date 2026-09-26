@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdmin } from '@/lib/auth/is-admin';
+import { logAdminAction } from '@/lib/audit/logger';
 
 export const dynamic = 'force-dynamic';
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdmin();
+    const { user } = await requireAdmin();
     const { id: ownerId } = await params;
 
     if (!ownerId) {
@@ -51,6 +52,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (delOwnerErr) {
       throw delOwnerErr;
     }
+
+    await logAdminAction({
+      adminUserId: user.id,
+      action: 'DELETE_TEAM_OWNER',
+      entityType: 'TEAM_OWNER',
+      entityId: ownerId,
+      oldValue: owner,
+    });
 
     return NextResponse.json({
       success: true,
