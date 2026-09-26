@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireAdmin } from '@/lib/auth/is-admin';
+import { logAdminAction } from '@/lib/audit/logger';
 
 export async function GET(
   req: NextRequest,
@@ -30,10 +32,17 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { user } = await requireAdmin();
     const { id } = await params;
     const body = await req.json();
 
     const supabase = createAdminClient();
+
+    const { data: oldTournament } = await supabase
+      .from('tournaments')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
 
     const updatePayload: any = {
       updated_at: new Date().toISOString(),
@@ -60,12 +69,22 @@ export async function PUT(
       return NextResponse.json({ error: error?.message || 'Failed to update tournament details' }, { status: 500 });
     }
 
+    await logAdminAction({
+      adminUserId: user.id,
+      action: 'UPDATE_TOURNAMENT',
+      entityType: 'TOURNAMENT',
+      entityId: id,
+      oldValue: oldTournament,
+      newValue: updatedTournament,
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Tournament details updated successfully!',
       tournament: updatedTournament,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+    const status = err.message?.includes('Unauthorized') ? 403 : 500;
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status });
   }
 }

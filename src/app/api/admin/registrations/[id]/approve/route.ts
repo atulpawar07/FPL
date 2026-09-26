@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireManager } from '@/lib/auth/is-manager';
+import { logAdminAction } from '@/lib/audit/logger';
 
 export async function POST(
   req: NextRequest,
@@ -155,6 +156,15 @@ export async function POST(
     const cascadeMsg = registration.team_owner_id
       ? ` (cascaded to linked Owner/Icon registrations)`
       : '';
+
+    await logAdminAction({
+      adminUserId: user.id,
+      action: 'UPDATE_REGISTRATION_STATUS',
+      entityType: 'REGISTRATION',
+      entityId: registrationId,
+      oldValue: { registration_status: registration.registration_status },
+      newValue: { registration_status: newStatus, action, payment_status: newPaymentStatus },
+    });
 
     return NextResponse.json({
       success: true,

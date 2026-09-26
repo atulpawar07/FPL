@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdmin } from '@/lib/auth/is-admin';
+import { logAdminAction } from '@/lib/audit/logger';
 
 // GET /api/admin/managers - List all managers
 export async function GET() {
@@ -56,6 +57,16 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (updateErr) throw updateErr;
+
+        await logAdminAction({
+          adminUserId: user.id,
+          action: 'GRANT_MANAGER',
+          entityType: 'MANAGER',
+          entityId: existing.id,
+          oldValue: existing,
+          newValue: updated,
+        });
+
         return NextResponse.json({ manager: updated, message: 'Manager access re-activated' });
       }
     }
@@ -81,6 +92,14 @@ export async function POST(req: NextRequest) {
 
     if (insertErr) throw insertErr;
 
+    await logAdminAction({
+      adminUserId: user.id,
+      action: 'GRANT_MANAGER',
+      entityType: 'MANAGER',
+      entityId: newManager.id,
+      newValue: newManager,
+    });
+
     return NextResponse.json({ manager: newManager, message: 'Manager access granted successfully' });
   } catch (err: any) {
     const status = err.message?.includes('Unauthorized') ? 403 : 500;
@@ -91,7 +110,7 @@ export async function POST(req: NextRequest) {
 // DELETE /api/admin/managers - Revoke manager role
 export async function DELETE(req: NextRequest) {
   try {
-    await requireAdmin();
+    const { user } = await requireAdmin();
     const supabase = createAdminClient();
 
     const { searchParams } = new URL(req.url);
@@ -107,6 +126,14 @@ export async function DELETE(req: NextRequest) {
       .eq('id', id);
 
     if (error) throw error;
+
+    await logAdminAction({
+      adminUserId: user.id,
+      action: 'REVOKE_MANAGER',
+      entityType: 'MANAGER',
+      entityId: id,
+      newValue: { is_active: false },
+    });
 
     return NextResponse.json({ success: true, message: 'Manager access revoked' });
   } catch (err: any) {

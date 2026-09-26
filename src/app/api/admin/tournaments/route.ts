@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdmin } from '@/lib/auth/is-admin';
+import { logAdminAction } from '@/lib/audit/logger';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -139,6 +140,14 @@ export async function POST(req: NextRequest) {
       if (error) throw error;
       result = created;
     }
+
+    await logAdminAction({
+      adminUserId: user.id,
+      action: id ? 'UPDATE_TOURNAMENT' : 'CREATE_TOURNAMENT',
+      entityType: 'TOURNAMENT',
+      entityId: result?.id || id || 'unknown',
+      newValue: result,
+    });
 
     return NextResponse.json({ success: true, tournament: result });
   } catch (err: any) {
