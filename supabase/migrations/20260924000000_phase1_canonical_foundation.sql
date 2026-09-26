@@ -128,7 +128,11 @@ CREATE TRIGGER trg_sync_registrations_canonical
 -- Populate existing canonical values
 UPDATE registrations 
 SET registration_number = COALESCE(registration_number, registration_reference, 'REG-' || id::text),
-    registration_status = COALESCE(registration_status, status, 'PENDING')
+    registration_status = COALESCE(
+        registration_status,
+        status::registration_status,
+        'PENDING'::registration_status
+    )
 WHERE registration_number IS NULL OR registration_status IS NULL;
 
 -- Payments Table Enhancements & Storage Object Reference Model
@@ -142,6 +146,23 @@ ALTER TABLE payments ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
 
 -- Backfill total amount logic if missing
 UPDATE payments SET owner_fee_paise = 0, player_fee_paise = amount WHERE owner_fee_paise IS NULL OR owner_fee_paise = 0;
+
+-- Create audit_logs if it was missed in legacy V1 migration skip
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    old_value JSONB,
+    new_value JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity
+    ON audit_logs(entity_type, entity_id);
+
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Audit Logs Foreign Key Protection
 ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_admin_user_id_fkey;
@@ -170,14 +191,16 @@ ALTER TABLE registrations
   ADD CONSTRAINT check_registration_type CHECK (registration_type IN ('PLAYER', 'OWNER', 'ICON'));
 
 -- Registration Status Check (5 Canonical States)
-ALTER TABLE registrations DROP CONSTRAINT IF EXISTS check_registration_status;
-ALTER TABLE registrations 
-  ADD CONSTRAINT check_registration_status CHECK (registration_status IN ('PENDING', 'CONFIRMED', 'WAITING_LIST', 'REJECTED', 'CANCELLED'));
+-- Ensure REJECTED is in the registration_status enum before adding the constraint
+ALTER TYPE registration_status ADD VALUE IF NOT EXISTS 'REJECTED';
 
--- Payment Status Check
-ALTER TABLE payments DROP CONSTRAINT IF EXISTS check_payment_status;
-ALTER TABLE payments 
-  ADD CONSTRAINT check_payment_status CHECK (status IN ('PENDING', 'SUCCESSFUL', 'FAILED', 'REFUNDED', 'CREATED', 'PROCESSING', 'CANCELLED'));
+
+
+-- Payment Status Enum
+-- Extend the existing remote enum before the constraint migration.
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'CREATED';
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'PROCESSING';
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'CANCELLED';
 
 -- Payment Fee Snapshot Check
 ALTER TABLE payments DROP CONSTRAINT IF EXISTS check_combined_fee_breakdown;
@@ -185,6 +208,19 @@ ALTER TABLE payments
   ADD CONSTRAINT check_combined_fee_breakdown CHECK (amount >= 0 AND amount = (owner_fee_paise + player_fee_paise));
 
 -- FK Relationships
+-- Drift Resolution: Ensure missing team owner registration columns exist
+ALTER TABLE team_owners
+  ADD COLUMN IF NOT EXISTS owner_registration_id UUID;
+
+ALTER TABLE team_owners
+  ADD COLUMN IF NOT EXISTS icon_registration_id UUID;
+
+ALTER TABLE team_owners
+  ADD COLUMN IF NOT EXISTS team_name TEXT;
+
+ALTER TABLE team_owners
+  ADD COLUMN IF NOT EXISTS team_logo_url TEXT;
+
 ALTER TABLE team_owners DROP CONSTRAINT IF EXISTS fk_team_owners_owner_reg;
 ALTER TABLE team_owners 
   ADD CONSTRAINT fk_team_owners_owner_reg 
