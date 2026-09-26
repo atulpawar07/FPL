@@ -7,6 +7,7 @@ import { Header } from '@/components/public/Header';
 import { Footer } from '@/components/public/Footer';
 import { Button } from '@/components/ui/Button';
 import { formatPaiseToINR, formatDate } from '@/lib/utils/format';
+import { getSortedUpcomingTournaments } from '@/lib/utils/tournament';
 import { DbTournament } from '@/types';
 import {
   Trophy,
@@ -44,7 +45,9 @@ function HomePageContent() {
       .finally(() => setLoadingTournaments(false));
   }, []);
 
-  const activeTournament = tournaments.find((t) => t.registration_open) || tournaments[0] || null;
+  const upcomingTournaments = getSortedUpcomingTournaments(tournaments);
+  const activeTournament = upcomingTournaments[0] || null;
+  const remainingUpcomingTournaments = upcomingTournaments.slice(1);
   const feeDisplay = activeTournament ? formatPaiseToINR(activeTournament.registration_fee) : '₹0';
 
   return (
@@ -295,7 +298,7 @@ function HomePageContent() {
 
           {loadingTournaments ? (
             <div className="p-12 text-center text-slate-400">Loading tournaments...</div>
-          ) : tournaments.length === 0 ? (
+          ) : upcomingTournaments.length === 0 ? (
             <div className="p-8 bg-slate-900 border border-slate-800 rounded-3xl text-center space-y-4 shadow-xl">
               <Trophy className="w-12 h-12 text-emerald-400 mx-auto" />
               <div className="space-y-1">
@@ -312,9 +315,15 @@ function HomePageContent() {
                 </Link>
               </div>
             </div>
+          ) : remainingUpcomingTournaments.length === 0 ? (
+            <div className="p-8 bg-slate-900/60 border border-slate-800/80 rounded-3xl text-center space-y-2 shadow-xl">
+              <p className="text-xs sm:text-sm text-slate-400">
+                No additional upcoming tournaments scheduled at this time. Check out our featured tournament above!
+              </p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {tournaments.map((item) => (
+              {remainingUpcomingTournaments.map((item) => (
                 <div
                   key={item.id}
                   className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl relative overflow-hidden group hover:border-emerald-500/50 transition-all"

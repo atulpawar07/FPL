@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdmin } from '@/lib/auth/is-admin';
 import { logAdminAction } from '@/lib/audit/logger';
+import { deleteTournamentSafely } from '@/lib/tournament/delete';
 
 export async function GET(
   req: NextRequest,
@@ -82,6 +83,36 @@ export async function PUT(
       success: true,
       message: 'Tournament details updated successfully!',
       tournament: updatedTournament,
+    });
+  } catch (err: any) {
+    const status = err.message?.includes('Unauthorized') ? 403 : 500;
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status });
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { user } = await requireAdmin();
+    const { id } = await params;
+    const body = await req.json().catch(() => ({}));
+
+    const result = await deleteTournamentSafely({
+      tournamentId: id,
+      confirmName: body.confirmName,
+      adminUserId: user.id,
+    });
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: result.code || 400 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Tournament "${result.tournamentName}" was deleted successfully`,
+      result,
     });
   } catch (err: any) {
     const status = err.message?.includes('Unauthorized') ? 403 : 500;

@@ -38,3 +38,7 @@ client_secret*.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local Supabase backup and CLI temp files
+pre_deployment_backup.sql
+supabase/.temp/
