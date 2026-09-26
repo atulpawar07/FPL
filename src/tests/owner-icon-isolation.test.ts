@@ -19,6 +19,7 @@ vi.mock('@/lib/storage/upload', () => ({
 describe('Owner Icon Isolation Security Tests', () => {
   let mockSupabaseServer: any;
   let mockSupabaseAdmin: any;
+  const mockPhoto = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -48,7 +49,10 @@ describe('Owner Icon Isolation Security Tests', () => {
   const createMockOwnerRequest = (body: any) => {
     return new NextRequest('http://localhost:3000/api/registrations/owner', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        iconProfileImageUrl: mockPhoto,
+        ...body,
+      }),
     });
   };
 
@@ -74,7 +78,6 @@ describe('Owner Icon Isolation Security Tests', () => {
       p_icon_mobile: '9999999999',
     }));
 
-    // API no longer passes p_icon_existing_player_id to RPC
     const callArgs = mockSupabaseAdmin.rpc.mock.calls[0][1];
     expect(callArgs).not.toHaveProperty('p_icon_existing_player_id');
   });
@@ -95,7 +98,6 @@ describe('Owner Icon Isolation Security Tests', () => {
     const res = await registerOwner(req);
     expect(res.status).toBe(200);
 
-    // API drops the payload
     const callArgs = mockSupabaseAdmin.rpc.mock.calls[0][1];
     expect(callArgs).not.toHaveProperty('p_icon_existing_player_id');
     expect(Object.values(callArgs)).not.toContain('hacker-supplied-uuid-of-another-player');
@@ -117,7 +119,6 @@ describe('Owner Icon Isolation Security Tests', () => {
     const res = await registerOwner(req);
     expect(res.status).toBe(200);
 
-    // Still dropped
     const callArgs = mockSupabaseAdmin.rpc.mock.calls[0][1];
     expect(callArgs).not.toHaveProperty('p_icon_existing_player_id');
   });
@@ -137,8 +138,6 @@ describe('Owner Icon Isolation Security Tests', () => {
 
     await registerOwner(req);
 
-    // DB migration 20260928000000 ensures this creates a NEW player record
-    // We verify the API passes it strictly as a string detail, not an ID
     const callArgs = mockSupabaseAdmin.rpc.mock.calls[0][1];
     expect(callArgs.p_icon_mobile).toBe('existing-player-mobile');
     expect(callArgs).not.toHaveProperty('p_icon_existing_player_id');
@@ -158,7 +157,6 @@ describe('Owner Icon Isolation Security Tests', () => {
 
     await registerOwner(req);
 
-    // Verified: Name is passed, but ID spoofing is structurally impossible
     const callArgs = mockSupabaseAdmin.rpc.mock.calls[0][1];
     expect(callArgs.p_icon_name).toBe('Existing Player Name');
     expect(callArgs).not.toHaveProperty('p_icon_existing_player_id');
@@ -179,9 +177,6 @@ describe('Owner Icon Isolation Security Tests', () => {
 
     await registerOwner(req);
 
-    // Check there are no external fetch calls or SMS triggers made in the API route
-    // (In our mocked environment, if any such calls existed, they would fail or be unmocked)
-    // The only external call is to Supabase RPC.
     expect(mockSupabaseAdmin.rpc).toHaveBeenCalledTimes(1);
   });
 });

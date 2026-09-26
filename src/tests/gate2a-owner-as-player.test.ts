@@ -61,6 +61,7 @@ const VALID_OWNER_BODY = {
   iconPlayerRole: 'BOWLER',
   iconPlayerBattingStyle: 'LEFT_HAND',
   iconPlayerBowlingStyle: 'RIGHT_ARM_FAST',
+  iconProfileImageUrl: 'data:image/png;base64,iVBORw0KGgo=',
 };
 
 const RPC_SUCCESS = [
@@ -615,6 +616,7 @@ describe('Gate 2A — Owner as Complete Player #1', () => {
         teamName: VALID_OWNER_BODY.teamName,
         // Omit ownerRole, ownerBattingStyle, ownerJerseySize → should use defaults
         iconPlayerName: VALID_OWNER_BODY.iconPlayerName,
+        iconProfileImageUrl: VALID_OWNER_BODY.iconProfileImageUrl,
       })
     );
 

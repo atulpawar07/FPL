@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     const profileImageUrl = body.profileImageUrl || body.profilePhotoPath;
     if (!profileImageUrl) {
-      return NextResponse.json({ error: 'Please upload your profile photo to complete registration' }, { status: 400 });
+      return NextResponse.json({ error: 'Please upload a profile photo to complete registration' }, { status: 400 });
     }
 
     const rawRole = body.cricketRole || body.primaryRole || 'BATSMAN';
@@ -29,20 +29,77 @@ export async function POST(req: NextRequest) {
     const battingStyle = body.battingStyle || 'RIGHT_HAND';
     const jerseySize = body.jerseySize || 'M';
 
-    // 1. Resolve Player Profile from Authenticated Session ONLY
-    const { data: playerProfile, error: profileErr } = await supabaseServer
-      .from('players')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .maybeSingle();
-
-    if (profileErr || !playerProfile?.id) {
-      return NextResponse.json({ error: 'You must complete your player profile before registering for a tournament.' }, { status: 400 });
-    }
-
-    const playerId = playerProfile.id;
-
+    const isOther = body.registrationFor === 'OTHER' || body.isSelf === false;
     const supabaseAdmin = createAdminClient();
+
+    let playerId: string;
+
+    if (isOther) {
+      // Create a NEW tournament-only participant record for OTHER person
+      const { data: newPlayer, error: newPlayerErr } = await supabaseAdmin
+        .from('players')
+        .insert({
+          full_name: fullName,
+          mobile: body.mobile || null,
+          email: body.email?.toLowerCase().trim() || user.email,
+          is_tournament_only: true,
+          player_type: 'STANDARD',
+          cricket_role: cricketRole,
+          batting_style: battingStyle,
+          bowling_style: body.bowlingStyle || null,
+          jersey_size: jerseySize,
+          profile_image_url: profileImageUrl,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (newPlayerErr || !newPlayer?.id) {
+        console.error('Failed to create tournament-only player:', newPlayerErr);
+        return NextResponse.json({ error: 'Failed to create participant profile' }, { status: 500 });
+      }
+
+      playerId = newPlayer.id;
+    } else {
+      // Resolve/Upsert primary Player Profile for SELF
+      const { data: playerProfile, error: profileErr } = await supabaseServer
+        .from('players')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+
+      if (profileErr) {
+        return NextResponse.json({ error: 'Failed to resolve player profile' }, { status: 500 });
+      }
+
+      if (!playerProfile?.id) {
+        // Auto-create primary player profile for user
+        const { data: newSelfPlayer, error: createSelfErr } = await supabaseAdmin
+          .from('players')
+          .insert({
+            auth_user_id: user.id,
+            full_name: fullName,
+            email: user.email?.toLowerCase().trim(),
+            mobile: body.mobile || null,
+            cricket_role: cricketRole,
+            batting_style: battingStyle,
+            jersey_size: jerseySize,
+            profile_image_url: profileImageUrl,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+
+        if (createSelfErr || !newSelfPlayer?.id) {
+          return NextResponse.json({ error: 'Failed to create player profile for user' }, { status: 500 });
+        }
+        playerId = newSelfPlayer.id;
+      } else {
+        playerId = playerProfile.id;
+      }
+    }
 
     // 2. Fetch Target Tournament
     let tournament;
@@ -72,7 +129,6 @@ export async function POST(req: NextRequest) {
     const tournamentId = tournament.id;
 
     // 3. Pre-validate Payment Screenshot File (if submitted)
-    // We ignore body.paymentScreenshotUrl to prevent client path spoofing.
     const screenshotBucket = 'payment-screenshots';
     let screenshotBuffer: Buffer | null = null;
     let screenshotValidation: any = null;
@@ -97,13 +153,16 @@ export async function POST(req: NextRequest) {
       p_registered_image_snapshot: profileImageUrl,
       p_screenshot_bucket: screenshotBucket,
       p_screenshot_object_path: null,
+      p_created_by_auth_id: user.id,
     });
 
     if (rpcErr || !rpcData || rpcData.length === 0) {
       console.error('RPC allocate_player_registration_v2 Error:', rpcErr);
-      return NextResponse.json({
-        error: rpcErr?.message || 'Failed to complete registration atomically',
-      }, { status: 400 });
+      const isDuplicate = rpcErr?.message?.includes('already registered') || rpcErr?.code === '23505';
+      const msg = isDuplicate
+        ? 'You are already registered for this tournament. To register someone else, please select "Someone else".'
+        : rpcErr?.message || 'Failed to complete registration atomically';
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
 
     const result = rpcData[0];
@@ -119,7 +178,6 @@ export async function POST(req: NextRequest) {
       try {
         await uploadToStorageBucket(screenshotBucket, screenshotObjectPath, screenshotBuffer, screenshotValidation.mimeType);
 
-        // Update payments row with canonical screenshot object path
         if (result.payment_id) {
           await supabaseAdmin
             .from('payments')
@@ -131,7 +189,6 @@ export async function POST(req: NextRequest) {
         }
       } catch (uploadErr: any) {
         console.error('Failed to upload payment screenshot:', uploadErr);
-        // Registration is preserved; client can upload screenshot via receipt page if needed
       }
     }
 

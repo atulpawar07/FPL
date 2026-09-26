@@ -105,6 +105,7 @@ describe('Gate 2B — Storage Security & Pre-Push Validation Unit Tests', () => 
         tournamentId: 't-1',
         ownerName: 'Alice',
         contactEmail: 'alice@example.com',
+        iconProfileImageUrl: 'data:image/png;base64,iVBORw0KGgo=',
         teamLogoUrl: 'https://malicious-external-domain.com/fake-logo.png',
       }),
     });

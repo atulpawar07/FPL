@@ -128,6 +128,7 @@ export default function RegisterPage() {
 
     try {
       const payload = {
+        registrationFor: personalData.registrationFor || 'SELF',
         fullName: personalData.fullName,
         email: personalData.email || (personalData.mobile ? `${personalData.mobile}@fairplay.local` : ''),
         profileImageUrl: personalData.profilePhotoPath,

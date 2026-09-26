@@ -23,64 +23,61 @@ export async function GET(
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 });
     }
 
-    // 2. Fetch registrations for this tournament — try full query, fallback for missing columns
+    // 2. Fetch registrations for this tournament
     let registrations: any[] = [];
-    {
-      const { data: regData, error: regErr } = await supabase
+    const { data: regData, error: regErr } = await supabase
+      .from('registrations')
+      .select(`
+        id,
+        tournament_id,
+        player_id,
+        registration_number,
+        status,
+        registration_status,
+        registration_type,
+        team_name,
+        team_owner_id,
+        waitlist_position,
+        registered_name_snapshot,
+        registered_role_snapshot,
+        registered_batting_style_snapshot,
+        registered_jersey_size_snapshot,
+        registered_image_snapshot,
+        registered_at,
+        players (
+          id,
+          full_name,
+          email,
+          profile_image_url
+        )
+      `)
+      .eq('tournament_id', tournamentId)
+      .order('registered_at', { ascending: true });
+
+    if (regErr) {
+      const { data: fbData } = await supabase
         .from('registrations')
         .select(`
           id,
           tournament_id,
           player_id,
           registration_number,
-          status,
           registration_status,
-          registration_type,
-          team_name,
-          team_owner_id,
           waitlist_position,
           registered_name_snapshot,
           registered_role_snapshot,
-          registered_batting_style_snapshot,
-          registered_jersey_size_snapshot,
-          registered_image_snapshot,
-          registered_at,
-          players (
-            id,
-            full_name,
-            email,
-            profile_image_url
-          )
+          registered_at
         `)
         .eq('tournament_id', tournamentId)
         .order('registered_at', { ascending: true });
-
-      if (regErr) {
-        console.warn('Full registration query failed, trying fallback:', regErr.message);
-        const { data: fbData } = await supabase
-          .from('registrations')
-          .select(`
-            id,
-            tournament_id,
-            player_id,
-            registration_number,
-            registration_status,
-            waitlist_position,
-            registered_name_snapshot,
-            registered_role_snapshot,
-            registered_at
-          `)
-          .eq('tournament_id', tournamentId)
-          .order('registered_at', { ascending: true });
-        registrations = (fbData || []).map((r: any) => ({
-          ...r,
-          status: r.registration_status,
-          registration_type: 'PLAYER',
-          registered_image_snapshot: '/logo.png',
-        }));
-      } else {
-        registrations = regData || [];
-      }
+      registrations = (fbData || []).map((r: any) => ({
+        ...r,
+        status: r.registration_status,
+        registration_type: 'PLAYER',
+        registered_image_snapshot: '/logo.png',
+      }));
+    } else {
+      registrations = regData || [];
     }
 
     // 3. Fetch payments for registrations in this tournament
@@ -94,16 +91,20 @@ export async function GET(
       payments = pData || [];
     }
 
-    // Enrich payments with 15-minute signed URLs for private storage objects
+    // Parallel signed URL resolution only for items with screenshot_object_path
     const enrichedPayments = await Promise.all(
       payments.map(async (p: any) => {
         let signedScreenshotUrl = p.payment_screenshot_url || '';
         if (p.screenshot_object_path) {
-          signedScreenshotUrl = await getSignedScreenshotUrl(
-            p.screenshot_bucket || 'payment-screenshots',
-            p.screenshot_object_path,
-            900
-          );
+          try {
+            signedScreenshotUrl = await getSignedScreenshotUrl(
+              p.screenshot_bucket || 'payment-screenshots',
+              p.screenshot_object_path,
+              900
+            );
+          } catch {
+            // Keep fallback URL if signed URL generation fails
+          }
         }
         return {
           ...p,
@@ -121,24 +122,23 @@ export async function GET(
         .eq('tournament_id', tournamentId)
         .order('slot_number', { ascending: true });
 
-      teamOwners = await Promise.all(
-        (ownersData || []).map(async (o: any) => {
-          // Link owner payment signed URL if matching registration exists
-          const matchingPayment = enrichedPayments.find((p: any) => p.team_owner_id === o.id || p.registration_id === o.owner_registration_id);
-          const ownerScreenshotUrl = matchingPayment?.payment_screenshot_url || o.payment_screenshot_url || '';
-          return {
-            ...o,
-            team_logo_url: resolveImageUrl(o.team_logo_url, 'team-logos', '/logo.png'),
-            payment_screenshot_url: ownerScreenshotUrl,
-          };
-        })
-      );
+      teamOwners = (ownersData || []).map((o: any) => {
+        const matchingPayment = enrichedPayments.find((p: any) => p.team_owner_id === o.id || p.registration_id === o.owner_registration_id);
+        const ownerScreenshotUrl = matchingPayment?.payment_screenshot_url || o.payment_screenshot_url || '';
+        return {
+          ...o,
+          team_logo_url: resolveImageUrl(o.team_logo_url, 'team-logos', '/logo.png'),
+          payment_screenshot_url: ownerScreenshotUrl,
+        };
+      });
     }
 
-    // Combine registrations with payments
+    // Combine registrations with payments (match direct registration_id OR team_owner_id for Icon registrations)
     const enrichedRegistrations = registrations.map((r: any) => {
-      const payment = enrichedPayments.find((p: any) => p.registration_id === r.id) || null;
-      const effectiveStatus = r.status || r.registration_status || 'PENDING';
+      const payment = enrichedPayments.find(
+        (p: any) => p.registration_id === r.id || (r.team_owner_id && p.team_owner_id === r.team_owner_id)
+      ) || null;
+      const effectiveStatus = r.registration_status || r.status || 'PENDING';
       return {
         ...r,
         registered_image_snapshot: resolveImageUrl(r.registered_image_snapshot, 'profile-images', '/logo.png'),
@@ -148,11 +148,10 @@ export async function GET(
       };
     });
 
-    const isConfirmedReg = (r: any) => r.status === 'CONFIRMED' || r.registration_status === 'CONFIRMED';
-    const isPendingReg = (r: any) => r.status === 'PENDING' || r.registration_status === 'PENDING';
-    const isWaitlistReg = (r: any) => r.status === 'WAITING_LIST' || r.registration_status === 'WAITING_LIST';
+    const isConfirmedReg = (r: any) => r.registration_status === 'CONFIRMED' || r.status === 'CONFIRMED';
+    const isPendingReg = (r: any) => r.registration_status === 'PENDING' || r.status === 'PENDING';
+    const isWaitlistReg = (r: any) => r.registration_status === 'WAITING_LIST' || r.status === 'WAITING_LIST';
 
-    // ALL types count toward player capacity (Owner is a player too)
     const confirmedPlayersCount = enrichedRegistrations.filter(isConfirmedReg).length;
     const pendingCount = enrichedRegistrations.filter(isPendingReg).length;
     const waitlistCount = enrichedRegistrations.filter(isWaitlistReg).length;
@@ -161,7 +160,7 @@ export async function GET(
     const standardPlayersCount = enrichedRegistrations.filter((r: any) => r.registration_type === 'PLAYER' || !r.registration_type).length;
 
     const successfulPayments = payments.filter((p: any) => p.payment_status === 'SUCCESSFUL').length;
-    const pendingPayments = payments.filter((p: any) => p.payment_status === 'PENDING').length;
+    const pendingPayments = payments.filter((p: any) => p.payment_status === 'PENDING' || p.payment_status === 'AWAITING_ORGANISER_ACKNOWLEDGEMENT').length;
 
     const maxTeams = tournament.max_teams || 8;
 
