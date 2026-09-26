@@ -23,9 +23,12 @@ export async function POST(
     }
 
     const body = await req.json();
+    const isRegisteringOther = body.targetType === 'OTHER' || (body.email && body.email.toLowerCase() !== (user.email || '').toLowerCase());
+    const participantEmail = body.email || user.email;
+
     const validationResult = tournamentRegistrationSchema.safeParse({
       ...body,
-      email: user.email,
+      email: participantEmail,
     });
 
     if (!validationResult.success) {
@@ -53,55 +56,77 @@ export async function POST(
       return NextResponse.json({ error: 'Registration for this tournament is currently closed.' }, { status: 400 });
     }
 
-    // 3. Upsert Reusable Player Profile (with fallback for missing columns on remote DB)
-    const playerPayload: any = {
-      auth_user_id: user.id,
-      full_name: data.fullName,
-      email: user.email!,
-      profile_image_url: data.profileImageUrl,
-      cricket_role: data.cricketRole,
-      batting_style: data.battingStyle || null,
-      jersey_size: data.jerseySize || null,
-      updated_at: new Date().toISOString(),
-    };
+    let player: any = null;
 
-    let { data: player, error: playerErr } = await supabaseAdmin
-      .from('players')
-      .upsert(playerPayload, { onConflict: 'auth_user_id' })
-      .select('*')
-      .maybeSingle();
+    if (isRegisteringOther) {
+      // Create a NEW participant record for "Another Player"
+      // DOES NOT overwrite the logged-in user's primary profile
+      const newPlayerPayload: any = {
+        full_name: data.fullName,
+        email: participantEmail,
+        profile_image_url: data.profileImageUrl,
+        cricket_role: data.cricketRole,
+        batting_style: data.battingStyle || null,
+        jersey_size: data.jerseySize || null,
+        is_tournament_only: true,
+        player_type: 'REGULAR',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-    if (playerErr && playerErr.message?.includes('column')) {
-      delete playerPayload.jersey_size;
-      delete playerPayload.batting_style;
+      const { data: createdPlayer, error: createPlayerErr } = await supabaseAdmin
+        .from('players')
+        .insert(newPlayerPayload)
+        .select('*')
+        .single();
 
-      const fallbackRes = await supabaseAdmin
+      if (createPlayerErr || !createdPlayer) {
+        return NextResponse.json({ error: createPlayerErr?.message || 'Failed to create participant profile' }, { status: 500 });
+      }
+
+      player = createdPlayer;
+    } else {
+      // Registering "Myself" -> Upsert Reusable Player Profile linked to auth_user_id
+      const playerPayload: any = {
+        auth_user_id: user.id,
+        full_name: data.fullName,
+        email: user.email!,
+        profile_image_url: data.profileImageUrl,
+        cricket_role: data.cricketRole,
+        batting_style: data.battingStyle || null,
+        jersey_size: data.jerseySize || null,
+        is_tournament_only: false,
+        updated_at: new Date().toISOString(),
+      };
+
+      let { data: selfPlayer, error: playerErr } = await supabaseAdmin
         .from('players')
         .upsert(playerPayload, { onConflict: 'auth_user_id' })
         .select('*')
         .maybeSingle();
 
-      player = fallbackRes.data;
-      playerErr = fallbackRes.error;
+      if (playerErr && playerErr.message?.includes('column')) {
+        delete playerPayload.jersey_size;
+        delete playerPayload.batting_style;
+
+        const fallbackRes = await supabaseAdmin
+          .from('players')
+          .upsert(playerPayload, { onConflict: 'auth_user_id' })
+          .select('*')
+          .maybeSingle();
+
+        selfPlayer = fallbackRes.data;
+        playerErr = fallbackRes.error;
+      }
+
+      if (playerErr || !selfPlayer) {
+        return NextResponse.json({ error: playerErr?.message || 'Failed to update player profile' }, { status: 500 });
+      }
+
+      player = selfPlayer;
     }
 
-    if (playerErr && playerErr.message?.includes('column')) {
-      delete playerPayload.auth_user_id;
-      const emailFallbackRes = await supabaseAdmin
-        .from('players')
-        .upsert(playerPayload, { onConflict: 'email' })
-        .select('*')
-        .maybeSingle();
-
-      player = emailFallbackRes.data;
-      playerErr = emailFallbackRes.error;
-    }
-
-    if (playerErr || !player) {
-      return NextResponse.json({ error: playerErr?.message || 'Failed to update player profile' }, { status: 500 });
-    }
-
-    // 4. Check for existing registration in this tournament
+    // 4. Check for existing registration for THIS SPECIFIC PLAYER in this tournament
     const { data: existingReg } = await supabaseAdmin
       .from('registrations')
       .select('id, registration_number, registration_status, status, waitlist_position')
@@ -146,7 +171,7 @@ export async function POST(
 
     const registrationNumber = generateRegistrationReference();
 
-    // 6. Insert Registration Record with Historical Snapshots
+    // 6. Insert Registration Record with Historical Snapshots and created_by_auth_id
     const regPayload: any = {
       tournament_id: tournamentId,
       player_id: player.id,
@@ -154,6 +179,7 @@ export async function POST(
       status: registrationStatus,
       registration_status: registrationStatus,
       registration_type: 'PLAYER',
+      created_by_auth_id: user.id,
       waitlist_position: waitlistPosition,
       registered_name_snapshot: data.fullName,
       registered_role_snapshot: data.cricketRole,

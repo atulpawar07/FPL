@@ -8,47 +8,67 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authErr } = await supabaseUser.auth.getUser();
 
     if (authErr || !user) {
-      return NextResponse.json({ error: 'Unauthorized: You must be logged in to claim an Icon profile.' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized: You must be logged in to link a participant profile.' }, { status: 401 });
     }
 
     const body = await req.json();
-    const { mobile, otpCode, playerProfileId } = body;
+    const { registrationNumber, mobile, confirmClaim = true, playerProfileId } = body;
 
-    if (!mobile || !otpCode) {
-      return NextResponse.json({ error: 'Mobile number and verification OTP code are required.' }, { status: 400 });
+    if (!registrationNumber || !mobile) {
+      return NextResponse.json({
+        error: 'Registration Reference Number and Contact Mobile Number are required for account linking.',
+      }, { status: 400 });
     }
 
-    // Explicit Verification Check (e.g. OTP validation check)
-    // For test environment, accept valid 6-digit OTPs matching verification code
-    if (otpCode.length !== 6 || isNaN(Number(otpCode))) {
-      return NextResponse.json({ error: 'Invalid verification OTP code. Please enter a 6-digit OTP.' }, { status: 400 });
+    if (!confirmClaim) {
+      return NextResponse.json({
+        error: 'Explicit user confirmation is required to proceed with account linking.',
+      }, { status: 400 });
     }
 
     const adminClient = createAdminClient();
 
-    // Locate matching tournament-only Icon record
-    let query = adminClient
-      .from('players')
-      .select('*')
-      .eq('mobile', mobile)
-      .eq('is_tournament_only', true)
-      .is('auth_user_id', null);
+    // 1. Verify Registration Reference Number matches the tournament registration
+    const { data: registration, error: regErr } = await adminClient
+      .from('registrations')
+      .select('id, player_id, registration_number, players!inner(id, full_name, mobile, is_tournament_only, auth_user_id)')
+      .eq('registration_number', registrationNumber.trim())
+      .maybeSingle();
 
-    if (playerProfileId) {
-      query = query.eq('id', playerProfileId);
-    }
-
-    const { data: unclaimedProfiles, error: fetchErr } = await query;
-
-    if (fetchErr || !unclaimedProfiles || unclaimedProfiles.length === 0) {
+    if (regErr || !registration || !registration.players) {
       return NextResponse.json({
-        error: 'No unclaimed tournament Icon record found for this mobile number.',
+        error: 'Invalid Registration Reference Number or participant record not found.',
       }, { status: 404 });
     }
 
-    const profileToClaim = unclaimedProfiles[0];
+    const targetPlayer = registration.players as any;
 
-    // Link profile explicitly to auth user ID and clear tournament-only flag
+    // 2. Security Check: Contact Mobile Number Verification
+    const cleanMobile = mobile.replace(/\D/g, '');
+    const playerMobile = (targetPlayer.mobile || '').replace(/\D/g, '');
+
+    if (cleanMobile !== playerMobile) {
+      return NextResponse.json({
+        error: 'Provided mobile number does not match the participant record on file.',
+      }, { status: 400 });
+    }
+
+    // 3. Prevent Hijacking / Re-linking already linked accounts
+    if (targetPlayer.auth_user_id && targetPlayer.auth_user_id !== user.id) {
+      return NextResponse.json({
+        error: 'This participant record is already linked to another user account.',
+      }, { status: 403 });
+    }
+
+    if (targetPlayer.auth_user_id === user.id) {
+      return NextResponse.json({
+        success: true,
+        claimedProfileId: targetPlayer.id,
+        message: `Participant profile for ${targetPlayer.full_name} is already linked to your account.`,
+      });
+    }
+
+    // 4. Update ONLY the target player's auth_user_id (no profile overwrites or snapshot mutation)
     const { error: updateErr } = await adminClient
       .from('players')
       .update({
@@ -56,7 +76,7 @@ export async function POST(req: NextRequest) {
         is_tournament_only: false,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', profileToClaim.id);
+      .eq('id', targetPlayer.id);
 
     if (updateErr) {
       throw updateErr;
@@ -64,11 +84,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      claimedProfileId: profileToClaim.id,
-      message: `Successfully claimed Icon profile for ${profileToClaim.full_name}. Profile is now linked to your account.`,
+      claimedProfileId: targetPlayer.id,
+      message: `Successfully linked participant profile for ${targetPlayer.full_name} to your logged-in account (Ref: ${registration.registration_number}).`,
     });
   } catch (err: any) {
-    console.error('Claim Icon Profile Error:', err);
+    console.error('Participant Account Linking Error:', err);
     return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }
