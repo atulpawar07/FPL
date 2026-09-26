@@ -11,14 +11,21 @@ export async function checkIsManagerOrAdmin() {
   }
 
   const email = user.email.toLowerCase();
-  const isAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === email);
+  const adminClient = createAdminClient();
 
-  if (isAdmin) {
-    return { isManager: true, isAdmin: true, user, role: 'ADMIN' as const };
+  // 1. Check DB-backed admin_users
+  const { data: adminEntry } = await adminClient
+    .from('admin_users')
+    .select('id, role, status')
+    .eq('id', user.id)
+    .eq('status', 'ACTIVE')
+    .maybeSingle();
+
+  if (adminEntry) {
+    return { isManager: true, isAdmin: true, user, role: (adminEntry.role || 'ADMIN') as any };
   }
 
-  // Check managers table using service role client to bypass potential RLS limits
-  const adminClient = createAdminClient();
+  // 2. Check managers table
   const { data: managerEntry } = await adminClient
     .from('managers')
     .select('id, is_active')

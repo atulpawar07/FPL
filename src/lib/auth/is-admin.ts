@@ -21,9 +21,8 @@ export async function checkIsAdmin() {
     .eq('status', 'ACTIVE')
     .maybeSingle();
 
-  const isBootstrapAdmin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  const isAdmin = !!adminEntry || isBootstrapAdmin;
-  const role = adminEntry?.role || (isBootstrapAdmin ? 'SUPER_ADMIN' : null);
+  const isAdmin = !!adminEntry;
+  const role = adminEntry?.role || null;
 
   return { isAdmin, user, role };
 }
