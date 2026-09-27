@@ -7,7 +7,7 @@ import { Header } from '@/components/public/Header';
 import { Footer } from '@/components/public/Footer';
 import { Button } from '@/components/ui/Button';
 import { formatPaiseToINR, formatDate } from '@/lib/utils/format';
-import { getSortedUpcomingTournaments } from '@/lib/utils/tournament';
+import { getOrderedTournaments, isTournamentCompleted } from '@/lib/utils/tournament';
 import { DbTournament } from '@/types';
 import {
   Trophy,
@@ -45,9 +45,11 @@ function HomePageContent() {
       .finally(() => setLoadingTournaments(false));
   }, []);
 
-  const upcomingTournaments = getSortedUpcomingTournaments(tournaments);
-  const activeTournament = upcomingTournaments[0] || null;
-  const remainingUpcomingTournaments = upcomingTournaments.slice(1);
+  // Ordered by created_at DESC — latest created tournament is always first/hero.
+  // Past tournaments remain in the list; isTournamentCompleted() drives display-only badges.
+  const orderedTournaments = getOrderedTournaments(tournaments);
+  const activeTournament = orderedTournaments[0] || null;
+  const remainingTournaments = orderedTournaments.slice(1);
   const feeDisplay = activeTournament ? formatPaiseToINR(activeTournament.registration_fee) : '₹0';
 
   return (
@@ -90,8 +92,20 @@ function HomePageContent() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-6">
             {/* Registration Deadline Banner Notice if closed */}
             {activeTournament && (() => {
+              const isCompleted = isTournamentCompleted(activeTournament.tournament_date);
               const isDeadlinePassed = activeTournament.registration_end_date ? new Date(activeTournament.registration_end_date) < new Date() : false;
               const isClosed = !activeTournament.registration_open || isDeadlinePassed;
+              if (isCompleted) {
+                return (
+                  <div className="p-4 bg-slate-900/90 border border-slate-700 rounded-2xl text-slate-300 text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 shadow-xl">
+                    <Trophy className="w-5 h-5 text-amber-400 shrink-0" />
+                    <span>
+                      <strong>{activeTournament.name}</strong> — Tournament Completed on{' '}
+                      <strong className="text-amber-300">{formatDate(activeTournament.tournament_date)}</strong>
+                    </span>
+                  </div>
+                );
+              }
               if (isClosed) {
                 return (
                   <div className="p-4 bg-rose-950/90 border border-rose-500/50 rounded-2xl text-rose-200 text-xs sm:text-sm font-semibold flex items-center justify-center gap-3 shadow-xl">
@@ -157,8 +171,18 @@ function HomePageContent() {
                 {/* MOBILE DISPLAY: ACTION BUTTONS RIGHT BELOW BANNER */}
                 <div className="block lg:hidden space-y-3">
                   {activeTournament && (() => {
+                    const isCompleted = isTournamentCompleted(activeTournament.tournament_date);
                     const isDeadlinePassed = activeTournament.registration_end_date ? new Date(activeTournament.registration_end_date) < new Date() : false;
                     const isClosed = !activeTournament.registration_open || isDeadlinePassed;
+
+                    if (isCompleted) {
+                      return (
+                        <div className="p-3 bg-slate-900/80 border border-slate-700 rounded-xl text-center text-amber-300 text-xs font-semibold flex items-center justify-center gap-2">
+                          <Trophy className="w-4 h-4 text-amber-400" />
+                          Tournament Completed — {formatDate(activeTournament.tournament_date)}
+                        </div>
+                      );
+                    }
 
                     if (isClosed) {
                       return (
@@ -238,8 +262,18 @@ function HomePageContent() {
                 {/* DESKTOP CTA BUTTONS */}
                 <div className="hidden lg:flex flex-col sm:flex-row items-center justify-start gap-4 pt-4">
                   {activeTournament ? (() => {
+                    const isCompleted = isTournamentCompleted(activeTournament.tournament_date);
                     const isDeadlinePassed = activeTournament.registration_end_date ? new Date(activeTournament.registration_end_date) < new Date() : false;
                     const isClosed = !activeTournament.registration_open || isDeadlinePassed;
+
+                    if (isCompleted) {
+                      return (
+                        <div className="p-3 bg-slate-900/80 border border-slate-700 rounded-xl text-amber-300 text-xs font-semibold flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-amber-400" />
+                          Tournament Completed — {formatDate(activeTournament.tournament_date)}
+                        </div>
+                      );
+                    }
 
                     if (isClosed) {
                       return (
@@ -288,7 +322,7 @@ function HomePageContent() {
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white mt-1 flex items-center gap-2">
                 <Trophy className="w-7 h-7 text-emerald-400" />
-                <span>Upcoming Cricket Tournaments</span>
+                <span>All Tournaments</span>
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-slate-400 max-w-md">
@@ -298,7 +332,7 @@ function HomePageContent() {
 
           {loadingTournaments ? (
             <div className="p-12 text-center text-slate-400">Loading tournaments...</div>
-          ) : upcomingTournaments.length === 0 ? (
+          ) : orderedTournaments.length === 0 ? (
             <div className="p-8 bg-slate-900 border border-slate-800 rounded-3xl text-center space-y-4 shadow-xl">
               <Trophy className="w-12 h-12 text-emerald-400 mx-auto" />
               <div className="space-y-1">
@@ -315,15 +349,15 @@ function HomePageContent() {
                 </Link>
               </div>
             </div>
-          ) : remainingUpcomingTournaments.length === 0 ? (
+          ) : remainingTournaments.length === 0 ? (
             <div className="p-8 bg-slate-900/60 border border-slate-800/80 rounded-3xl text-center space-y-2 shadow-xl">
               <p className="text-xs sm:text-sm text-slate-400">
-                No additional upcoming tournaments scheduled at this time. Check out our featured tournament above!
+                No other tournaments at this time. See the featured tournament above.
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {remainingUpcomingTournaments.map((item) => (
+              {remainingTournaments.map((item) => (
                 <div
                   key={item.id}
                   className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl relative overflow-hidden group hover:border-emerald-500/50 transition-all"
@@ -338,9 +372,15 @@ function HomePageContent() {
                         <span className="text-xs text-slate-400">Official Tournament</span>
                       </div>
                     </div>
-                    <span className="px-3 py-1 bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-xs font-bold rounded-full uppercase">
-                      {item.registration_open ? 'Open' : 'Closed'}
-                    </span>
+                    {isTournamentCompleted(item.tournament_date) ? (
+                      <span className="px-3 py-1 bg-slate-800 border border-slate-600 text-amber-300 text-xs font-bold rounded-full uppercase">
+                        Completed
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-xs font-bold rounded-full uppercase">
+                        {item.registration_open ? 'Open' : 'Closed'}
+                      </span>
+                    )}
                   </div>
 
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
@@ -366,8 +406,15 @@ function HomePageContent() {
 
                   <div className="pt-2 flex justify-end">
                     <Link href={`/tournament/${item.id}`} className="w-full sm:w-auto">
-                      <Button size="md" className="w-full sm:w-auto" rightIcon={<ArrowRight className="w-4 h-4" />}>
-                        Register Now ({formatPaiseToINR(item.registration_fee)})
+                      <Button
+                        size="md"
+                        className="w-full sm:w-auto"
+                        variant={isTournamentCompleted(item.tournament_date) ? 'outline' : undefined}
+                        rightIcon={<ArrowRight className="w-4 h-4" />}
+                      >
+                        {isTournamentCompleted(item.tournament_date)
+                          ? 'View Tournament'
+                          : `Register Now (${formatPaiseToINR(item.registration_fee)})`}
                       </Button>
                     </Link>
                   </div>
