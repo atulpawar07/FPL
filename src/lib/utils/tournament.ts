@@ -53,8 +53,36 @@ export function isUpcomingTournament(dateStr?: string | null, referenceDate: Dat
 }
 
 /**
- * Filters and sorts tournaments to get upcoming tournaments ordered by date ascending.
- * Nearest upcoming tournament will be at index 0.
+ * Checks if a tournament's date has already passed (display-only — does NOT affect ordering).
+ * Used to show "Tournament Completed" badge on past tournaments.
+ */
+export function isTournamentCompleted(dateStr?: string | null, referenceDate: Date = new Date()): boolean {
+  return !isUpcomingTournament(dateStr, referenceDate);
+}
+
+/**
+ * Returns all tournaments in the order supplied by the API (created_at DESC from the server).
+ *
+ * ORDERING RULE:
+ *   - The most recently CREATED tournament is always first (index 0) → hero/top.
+ *   - Tournament date does NOT affect ordering — it is used only for display badges.
+ *   - Completed tournaments remain in the list and can be the hero.
+ *   - No tournament is ever hidden solely because its date has passed.
+ *
+ * The API (/api/tournaments/upcoming) already orders by created_at DESC, id DESC.
+ * This function simply validates and returns the array as-is.
+ */
+export function getOrderedTournaments(tournaments: DbTournament[]): DbTournament[] {
+  if (!Array.isArray(tournaments)) return [];
+  return tournaments;
+}
+
+/**
+ * @deprecated Use getOrderedTournaments instead.
+ *
+ * Legacy helper kept for backward compatibility with existing test suites.
+ * It filters to date >= refDate and sorts by date ASC.
+ * This function is NO LONGER used by the homepage or any production code path.
  */
 export function getSortedUpcomingTournaments(
   tournaments: DbTournament[],
