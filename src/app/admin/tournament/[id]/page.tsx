@@ -50,6 +50,29 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
+
+  const handleViewReceipt = async (url: string | null | undefined) => {
+    if (!url || url.trim() === '') return;
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:image/')) {
+      setPreviewImageUrl(url);
+      return;
+    }
+    setLoadingReceipt(true);
+    try {
+      const res = await fetch(`/api/admin/payments/screenshot-url?path=${encodeURIComponent(url)}`);
+      const resData = await res.json();
+      if (res.ok && resData.signedUrl) {
+        setPreviewImageUrl(resData.signedUrl);
+      } else {
+        setActionMessage(`Error loading receipt: ${resData.error || 'Failed to generate signed URL'}`);
+      }
+    } catch {
+      setActionMessage('Network error fetching signed screenshot URL');
+    } finally {
+      setLoadingReceipt(false);
+    }
+  };
 
   const fetchSummary = () => {
     setLoading(true);
@@ -559,7 +582,8 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setPreviewImageUrl(r.payment.payment_screenshot_url)}
+                          isLoading={loadingReceipt}
+                          onClick={() => handleViewReceipt(r.payment.payment_screenshot_url)}
                           leftIcon={<Eye className="w-3.5 h-3.5 text-sky-400" />}
                         >
                           View Receipt
@@ -663,7 +687,8 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
                   <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
                     {o.payment_screenshot_url ? (
                       <button
-                        onClick={() => setPreviewImageUrl(o.payment_screenshot_url)}
+                        onClick={() => handleViewReceipt(o.payment_screenshot_url)}
+                        disabled={loadingReceipt}
                         className="px-2.5 py-1 bg-sky-950/80 border border-sky-500/40 text-sky-300 hover:bg-sky-900 font-semibold text-xs rounded-xl transition-colors inline-flex items-center gap-1"
                       >
                         <Eye className="w-3.5 h-3.5 text-sky-400" />
@@ -735,7 +760,8 @@ export default function SingleTournamentAdminPage({ params }: { params: Promise<
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPreviewImageUrl(r.payment.payment_screenshot_url)}
+                      isLoading={loadingReceipt}
+                      onClick={() => handleViewReceipt(r.payment.payment_screenshot_url)}
                       leftIcon={<Eye className="w-3.5 h-3.5 text-sky-400" />}
                     >
                       View Receipt Screenshot

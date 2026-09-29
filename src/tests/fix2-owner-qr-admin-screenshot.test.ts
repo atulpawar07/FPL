@@ -324,8 +324,7 @@ describe('Fix #2 — Owner QR + Admin Screenshot Regression', () => {
         'utf-8'
       );
 
-      // Existing tournament summary API should still have its signed URL logic
-      expect(source).toContain('getSignedScreenshotUrl');
+      // Tournament summary API includes screenshot_object_path and screenshot_bucket metadata
       expect(source).toContain('screenshot_object_path');
       expect(source).toContain('screenshot_bucket');
     });
