@@ -34,8 +34,7 @@ export async function GET(req: NextRequest) {
         email,
         mobile,
         cricket_role,
-        batting_style,
-        jersey_size
+        batting_style
       ),
       payments:payments (
         amount,
@@ -109,7 +108,7 @@ export async function GET(req: NextRequest) {
         `"${(row.registered_bowling_style_snapshot || '-').replace(/"/g, '""')}"`,
         `"${(row.registered_name_snapshot || p.full_name || '').replace(/"/g, '""')}"`,
         `"-"`,
-        `"${(row.registered_jersey_size_snapshot || p.jersey_size || 'M').replace(/"/g, '""')}"`,
+        `"${(row.registered_jersey_size_snapshot || 'M').replace(/"/g, '""')}"`,
         `"${(pay.payment_method || 'UPI_QR').replace(/"/g, '""')}"`,
         `"${(pay.payment_status || 'PENDING').replace(/"/g, '""')}"`,
         `"${(row.registration_status || '').replace(/"/g, '""')}"`,

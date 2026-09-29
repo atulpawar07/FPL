@@ -42,8 +42,7 @@ export async function GET(req: NextRequest) {
         player:players (
           id,
           full_name,
-          email,
-          jersey_size
+          email
         ),
         tournament:tournaments (
           id,

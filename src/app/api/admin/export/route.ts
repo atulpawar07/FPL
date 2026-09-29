@@ -20,8 +20,7 @@ export async function GET() {
           full_name,
           email,
           cricket_role,
-          batting_style,
-          jersey_size
+          batting_style
         ),
         payments:payments (
           amount,
@@ -63,7 +62,7 @@ export async function GET() {
         `"${p.email || ''}"`,
         `"${row.registered_role_snapshot || p.cricket_role || ''}"`,
         `"${row.registered_batting_style_snapshot || p.batting_style || ''}"`,
-        `"${row.registered_jersey_size_snapshot || p.jersey_size || 'M'}"`,
+        `"${row.registered_jersey_size_snapshot || 'M'}"`,
         `"${row.registration_status || ''}"`,
         `"${pay.payment_status || 'PENDING'}"`,
         `"${pay.amount ? pay.amount / 100 : 500}"`,
