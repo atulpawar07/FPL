@@ -157,4 +157,47 @@ describe('Phase 2 — Export Services & Auction-Ready Data Separation', () => {
     expect(fixedTeamAssignments).toHaveLength(1);
     expect(fixedTeamAssignments[0].name).toBe('Icon B');
   });
+
+  it('Ensures admin exports select registered_jersey_size_snapshot from registrations without asking players table for jersey_size', async () => {
+    let capturedSelectString = '';
+    (createAdminClient as unknown as any).mockImplementation(() => ({
+      from: (table: string) => {
+        if (table === 'admin_users') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  maybeSingle: async () => ({
+                    data: { id: 'admin-1', role: 'SUPER_ADMIN', status: 'ACTIVE' },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'registrations') {
+          return {
+            select: (selectStr: string) => {
+              capturedSelectString = selectStr;
+              return {
+                eq: () => ({
+                  eq: async () => ({ data: [], error: null }),
+                  then: (onFulfilled: any) => Promise.resolve({ data: [], error: null }).then(onFulfilled),
+                }),
+                then: (onFulfilled: any) => Promise.resolve({ data: [], error: null }).then(onFulfilled),
+              };
+            },
+          };
+        }
+        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) };
+      },
+    }));
+
+    const req = new NextRequest('http://localhost:3000/api/admin/export/excel?tournamentId=tourney-1&scope=approved');
+    await exportExcel(req);
+
+    expect(capturedSelectString).toContain('registered_jersey_size_snapshot');
+    expect(capturedSelectString).not.toMatch(/player:players\s*\([^)]*jersey_size[^)]*\)/);
+  });
 });

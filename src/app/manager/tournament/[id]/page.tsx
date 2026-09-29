@@ -25,6 +25,25 @@ export default function SingleTournamentManagerPage({ params }: { params: Promis
   const [activeTab, setActiveTab] = useState<'approval' | 'payments' | 'registrations'>('approval');
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
+  const handleViewProof = async (url: string | null | undefined) => {
+    if (!url || url.trim() === '') return;
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:image/')) {
+      window.open(url, '_blank');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/payments/screenshot-url?path=${encodeURIComponent(url)}`);
+      const resData = await res.json();
+      if (res.ok && resData.signedUrl) {
+        window.open(resData.signedUrl, '_blank');
+      } else {
+        alert('Failed to generate proof image link');
+      }
+    } catch {
+      alert('Network error fetching proof image link');
+    }
+  };
+
   const fetchSummary = () => {
     setLoading(true);
     fetch(`/api/admin/tournament/${tournamentId}/summary`)
@@ -196,11 +215,14 @@ export default function SingleTournamentManagerPage({ params }: { params: Promis
 
                 <div className="flex items-center gap-2">
                   {r.payment?.payment_screenshot_url && (
-                    <a href={r.payment.payment_screenshot_url} target="_blank" rel="noreferrer">
-                      <Button variant="outline" size="sm" leftIcon={<FileImage className="w-3.5 h-3.5 text-sky-400" />}>
-                        View Proof
-                      </Button>
-                    </a>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewProof(r.payment.payment_screenshot_url)}
+                      leftIcon={<FileImage className="w-3.5 h-3.5 text-sky-400" />}
+                    >
+                      View Proof
+                    </Button>
                   )}
                   <Button
                     variant="primary"

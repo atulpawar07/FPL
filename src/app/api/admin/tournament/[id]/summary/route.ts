@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireManager } from '@/lib/auth/is-manager';
-import { getSignedScreenshotUrl, resolveImageUrl } from '@/lib/storage/upload';
+import { resolveImageUrl } from '@/lib/storage/upload';
 
 export async function GET(
   req: NextRequest,
@@ -12,49 +12,55 @@ export async function GET(
     const { id: tournamentId } = await params;
     const supabase = createAdminClient();
 
-    // 1. Fetch tournament details
-    const { data: tournament, error: tourneyErr } = await supabase
-      .from('tournaments')
-      .select('*')
-      .eq('id', tournamentId)
-      .single();
+    // 1. Concurrently fetch independent initial data: Tournament, Registrations, and Team Owners
+    const [tourneyRes, regRes, ownersRes] = await Promise.all([
+      supabase
+        .from('tournaments')
+        .select('*')
+        .eq('id', tournamentId)
+        .single(),
+      supabase
+        .from('registrations')
+        .select(`
+          id,
+          tournament_id,
+          player_id,
+          registration_number,
+          status,
+          registration_status,
+          registration_type,
+          team_name,
+          team_owner_id,
+          waitlist_position,
+          registered_name_snapshot,
+          registered_role_snapshot,
+          registered_batting_style_snapshot,
+          registered_jersey_size_snapshot,
+          registered_image_snapshot,
+          registered_at,
+          players (
+            id,
+            full_name,
+            email,
+            profile_image_url
+          )
+        `)
+        .eq('tournament_id', tournamentId)
+        .order('registered_at', { ascending: true }),
+      supabase
+        .from('team_owners')
+        .select('*')
+        .eq('tournament_id', tournamentId)
+        .order('slot_number', { ascending: true }),
+    ]);
 
-    if (tourneyErr || !tournament) {
+    const tournament = tourneyRes.data;
+    if (tourneyRes.error || !tournament) {
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 });
     }
 
-    // 2. Fetch registrations for this tournament
     let registrations: any[] = [];
-    const { data: regData, error: regErr } = await supabase
-      .from('registrations')
-      .select(`
-        id,
-        tournament_id,
-        player_id,
-        registration_number,
-        status,
-        registration_status,
-        registration_type,
-        team_name,
-        team_owner_id,
-        waitlist_position,
-        registered_name_snapshot,
-        registered_role_snapshot,
-        registered_batting_style_snapshot,
-        registered_jersey_size_snapshot,
-        registered_image_snapshot,
-        registered_at,
-        players (
-          id,
-          full_name,
-          email,
-          profile_image_url
-        )
-      `)
-      .eq('tournament_id', tournamentId)
-      .order('registered_at', { ascending: true });
-
-    if (regErr) {
+    if (regRes.error) {
       const { data: fbData } = await supabase
         .from('registrations')
         .select(`
@@ -77,52 +83,46 @@ export async function GET(
         registered_image_snapshot: '/logo.png',
       }));
     } else {
-      registrations = regData || [];
+      registrations = regRes.data || [];
     }
 
-    // 3. Fetch payments for registrations in this tournament
+    // 2. Fetch payments for registrations in this tournament
     const regIds = registrations.map((r: any) => r.id);
     let payments: any[] = [];
     if (regIds.length > 0) {
       const { data: pData } = await supabase
         .from('payments')
-        .select('*')
+        .select(`
+          id,
+          registration_id,
+          team_owner_id,
+          amount,
+          payment_method,
+          payment_status,
+          payment_screenshot_url,
+          screenshot_object_path,
+          screenshot_bucket,
+          transaction_reference,
+          verification_note,
+          verified_by,
+          verified_at,
+          created_at
+        `)
         .in('registration_id', regIds);
       payments = pData || [];
     }
 
-    // Parallel signed URL resolution only for items with screenshot_object_path
-    const enrichedPayments = await Promise.all(
-      payments.map(async (p: any) => {
-        let signedScreenshotUrl = p.payment_screenshot_url || '';
-        if (p.screenshot_object_path) {
-          try {
-            signedScreenshotUrl = await getSignedScreenshotUrl(
-              p.screenshot_bucket || 'payment-screenshots',
-              p.screenshot_object_path,
-              900
-            );
-          } catch {
-            // Keep fallback URL if signed URL generation fails
-          }
-        }
-        return {
-          ...p,
-          payment_screenshot_url: signedScreenshotUrl,
-        };
-      })
-    );
+    // Fast in-memory map without blocking signed URL API loop
+    const enrichedPayments = payments.map((p: any) => ({
+      ...p,
+      payment_screenshot_url: p.payment_screenshot_url || p.screenshot_object_path || '',
+    }));
 
-    // 4. Fetch Team Owners if OWNER_BASED
+    // 3. Process Team Owners if OWNER_BASED
     let teamOwners: any[] = [];
     if (tournament.tournament_type === 'OWNER_BASED') {
-      const { data: ownersData } = await supabase
-        .from('team_owners')
-        .select('*')
-        .eq('tournament_id', tournamentId)
-        .order('slot_number', { ascending: true });
-
-      teamOwners = (ownersData || []).map((o: any) => {
+      const ownersData = ownersRes.data || [];
+      teamOwners = ownersData.map((o: any) => {
         const matchingPayment = enrichedPayments.find((p: any) => p.team_owner_id === o.id || p.registration_id === o.owner_registration_id);
         const ownerScreenshotUrl = matchingPayment?.payment_screenshot_url || o.payment_screenshot_url || '';
         return {

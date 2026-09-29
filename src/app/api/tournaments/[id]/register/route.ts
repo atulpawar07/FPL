@@ -67,7 +67,6 @@ export async function POST(
         profile_image_url: data.profileImageUrl,
         cricket_role: data.cricketRole,
         batting_style: data.battingStyle || null,
-        jersey_size: data.jerseySize || null,
         is_tournament_only: true,
         player_type: 'REGULAR',
         created_at: new Date().toISOString(),
