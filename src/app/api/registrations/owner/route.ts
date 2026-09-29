@@ -78,7 +78,6 @@ export async function POST(req: NextRequest) {
           mobile: contactPhone || null,
           cricket_role: ownerRole || 'BATSMAN',
           batting_style: ownerBattingStyle || 'RIGHT_HAND',
-          jersey_size: ownerJerseySize || 'M',
           profile_image_url: ownerProfileImageUrl || null,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'auth_user_id' })
