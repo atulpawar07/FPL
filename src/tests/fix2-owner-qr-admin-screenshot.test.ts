@@ -1,0 +1,333 @@
+import { describe, beforeEach, it, expect, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getSignedScreenshotUrl } from '@/lib/storage/upload';
+import fs from 'fs';
+import path from 'path';
+
+vi.mock('@/lib/supabase/server', () => ({
+  createServerSupabaseClient: vi.fn(),
+}));
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(),
+}));
+
+vi.mock('@/lib/storage/upload', async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    getSignedScreenshotUrl: vi.fn(),
+    uploadToStorageBucket: vi.fn().mockResolvedValue({ publicUrl: 'https://storage/img.png' }),
+  };
+});
+
+vi.mock('@/lib/auth/is-manager', () => ({
+  requireManager: vi.fn().mockResolvedValue({
+    user: { id: 'admin-1', email: 'admin@fpl.com' },
+    isAdmin: true,
+    role: 'SUPER_ADMIN',
+  }),
+}));
+
+/**
+ * FIX #2 — Owner/Icon QR Display + Admin Payment Screenshot
+ */
+describe('Fix #2 — Owner QR + Admin Screenshot Regression', () => {
+
+  // ========================================================
+  // FIX A — OWNER MODAL QR/UPI RENDERING
+  // ========================================================
+  describe('Fix A — Owner Modal Payment QR/UPI Display', () => {
+
+    it('1. Owner modal renders tournament.payment_qr_url as QR image', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
+        'utf-8'
+      );
+
+      // Must contain an <img> tag with tournament payment_qr_url
+      expect(source).toContain('tournament?.payment_qr_url');
+      expect(source).toContain('alt="UPI QR Code"');
+    });
+
+    it('2. Owner modal displays tournament.upi_id when available', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
+        'utf-8'
+      );
+
+      expect(source).toContain("tournament?.upi_id || 'Not configured'");
+    });
+
+    it('3. Owner modal provides UPI deep links for GPay/PhonePe/Paytm', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
+        'utf-8'
+      );
+
+      expect(source).toContain('upi://pay?pa=');
+      expect(source).toContain('GPay / PhonePe');
+      expect(source).toContain('Paytm / BHIM');
+    });
+
+    it('4. Owner modal screenshot upload remains available for UPI payment', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
+        'utf-8'
+      );
+
+      // Screenshot upload section must exist within UPI_QR flow
+      expect(source).toContain('Upload Payment Proof');
+      expect(source).toContain('handleScreenshotUpload');
+    });
+
+    it('5. Acknowledge by Organiser does not require screenshot', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
+        'utf-8'
+      );
+
+      // ACKNOWLEDGE_BY_ORGANISER section must NOT contain screenshot upload
+      const ackSection = source.match(
+        /paymentMethod === 'ACKNOWLEDGE_BY_ORGANISER'[\s\S]*?Organiser will verify payment offline[\s\S]*?<\/div>/
+      );
+      expect(ackSection).toBeTruthy();
+      const ackText = ackSection![0];
+      expect(ackText).not.toContain('handleScreenshotUpload');
+      expect(ackText).not.toContain('Upload Payment Proof');
+    });
+
+    it('6. Owner modal imports QrCode icon', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
+        'utf-8'
+      );
+
+      expect(source).toContain('QrCode');
+    });
+
+    it('7. Owner modal shows combined fee in QR section', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
+        'utf-8'
+      );
+
+      expect(source).toContain('totalClubbedFeeDisplay');
+      expect(source).toContain('Owner + Icon combined fee');
+    });
+  });
+
+  // ========================================================
+  // FIX B — ADMIN PLAYERS API SCREENSHOT RESOLUTION
+  // ========================================================
+  describe('Fix B — Admin Players API Signed Screenshot URL', () => {
+
+    it('5. Admin Players API resolves screenshot_object_path into signed URL', async () => {
+      // Mock the signed URL generator to return a known value
+      (getSignedScreenshotUrl as any).mockResolvedValue(
+        'https://supabase.co/storage/v1/object/sign/payment-screenshots/t1/r1/proof.png?token=abc123'
+      );
+
+      const mockAdmin = {
+        from: (table: string) => {
+          if (table === 'tournaments') {
+            return {
+              select: () => ({
+                order: () => ({
+                  data: [{ id: 't-1', name: 'Test Tournament' }],
+                  error: null,
+                }),
+              }),
+            };
+          }
+          if (table === 'registrations') {
+            return {
+              select: () => ({
+                order: () => ({
+                  data: [{
+                    id: 'reg-1',
+                    tournament_id: 't-1',
+                    player_id: 'p-1',
+                    registration_number: 'REG-2026-00001',
+                    registration_status: 'CONFIRMED',
+                    registered_name_snapshot: 'Test Player',
+                    registered_role_snapshot: 'BATSMAN',
+                    registered_at: '2026-09-01T00:00:00Z',
+                    player: { id: 'p-1', full_name: 'Test Player', email: 'test@example.com' },
+                    tournament: { id: 't-1', name: 'Test Tournament' },
+                    payments: [{
+                      id: 'pay-1',
+                      amount: 50000,
+                      payment_status: 'PENDING',
+                      payment_screenshot_url: null,
+                      screenshot_object_path: 't-1/reg-1/1234_abcd.png',
+                      screenshot_bucket: 'payment-screenshots',
+                      transaction_reference: 'UPI-12345678',
+                      verification_note: null,
+                      verified_by: null,
+                      verified_at: null,
+                      created_at: '2026-09-01T00:00:00Z',
+                    }],
+                  }],
+                  error: null,
+                  eq: () => ({
+                    data: null,
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          return {};
+        },
+      };
+
+      (createAdminClient as any).mockReturnValue(mockAdmin);
+
+      const { GET } = await import('@/app/api/admin/players/route');
+      const req = new NextRequest('http://localhost:3000/api/admin/players');
+      const res = await GET(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.players).toBeDefined();
+      expect(json.players.length).toBeGreaterThan(0);
+
+      // The payment should now have a resolved signed URL
+      const payment = json.players[0].payments?.[0];
+      expect(payment).toBeDefined();
+      expect(payment.payment_screenshot_url).toContain('payment-screenshots');
+      expect(payment.payment_screenshot_url).toContain('token=');
+
+      // Verify getSignedScreenshotUrl was called with the right arguments
+      expect(getSignedScreenshotUrl).toHaveBeenCalledWith(
+        'payment-screenshots',
+        't-1/reg-1/1234_abcd.png',
+        900
+      );
+    });
+
+    it('6. Admin Players API does not depend on payment_screenshot_url stored in DB', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/api/admin/players/route.ts'),
+        'utf-8'
+      );
+
+      // Must select screenshot_object_path from DB
+      expect(source).toContain('screenshot_object_path');
+      expect(source).toContain('screenshot_bucket');
+
+      // Must call getSignedScreenshotUrl to resolve
+      expect(source).toContain('getSignedScreenshotUrl');
+    });
+
+    it('7. Missing screenshot_object_path is handled safely', async () => {
+      // No signed URL should be generated when screenshot_object_path is missing
+      (getSignedScreenshotUrl as any).mockClear();
+
+      const mockAdmin = {
+        from: (table: string) => {
+          if (table === 'tournaments') {
+            return {
+              select: () => ({
+                order: () => ({
+                  data: [{ id: 't-1', name: 'Test Tournament' }],
+                  error: null,
+                }),
+              }),
+            };
+          }
+          if (table === 'registrations') {
+            return {
+              select: () => ({
+                order: () => ({
+                  data: [{
+                    id: 'reg-1',
+                    tournament_id: 't-1',
+                    player_id: 'p-1',
+                    registration_number: 'REG-2026-00001',
+                    registration_status: 'CONFIRMED',
+                    registered_name_snapshot: 'Test Player',
+                    registered_role_snapshot: 'BATSMAN',
+                    registered_at: '2026-09-01T00:00:00Z',
+                    player: { id: 'p-1', full_name: 'Test Player', email: 'test@example.com' },
+                    tournament: { id: 't-1', name: 'Test Tournament' },
+                    payments: [{
+                      id: 'pay-1',
+                      amount: 50000,
+                      payment_status: 'PENDING',
+                      payment_screenshot_url: null,
+                      screenshot_object_path: null,
+                      screenshot_bucket: null,
+                      transaction_reference: null,
+                      verification_note: null,
+                      verified_by: null,
+                      verified_at: null,
+                      created_at: '2026-09-01T00:00:00Z',
+                    }],
+                  }],
+                  error: null,
+                  eq: () => ({
+                    data: null,
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          return {};
+        },
+      };
+
+      (createAdminClient as any).mockReturnValue(mockAdmin);
+
+      const { GET } = await import('@/app/api/admin/players/route');
+      const req = new NextRequest('http://localhost:3000/api/admin/players');
+      const res = await GET(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+
+      // getSignedScreenshotUrl should NOT be called when screenshot_object_path is null
+      expect(getSignedScreenshotUrl).not.toHaveBeenCalled();
+
+      // payment_screenshot_url should remain empty/falsy
+      const payment = json.players[0].payments?.[0];
+      expect(payment.payment_screenshot_url).toBeFalsy();
+    });
+
+    it('8. Admin authorization is required (managed by requireManager)', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/api/admin/players/route.ts'),
+        'utf-8'
+      );
+
+      // Must call requireManager before processing
+      expect(source).toContain('await requireManager()');
+    });
+
+    it('9. Signed URLs use time-limited expiration (900s)', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/api/admin/players/route.ts'),
+        'utf-8'
+      );
+
+      // Must pass 900 second expiry to match tournament summary API
+      expect(source).toMatch(/getSignedScreenshotUrl\([^)]*900\s*\)/);
+    });
+
+    it('10. Tournament summary screenshot behavior remains intact', () => {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/app/api/admin/tournament/[id]/summary/route.ts'),
+        'utf-8'
+      );
+
+      // Existing tournament summary API should still have its signed URL logic
+      expect(source).toContain('getSignedScreenshotUrl');
+      expect(source).toContain('screenshot_object_path');
+      expect(source).toContain('screenshot_bucket');
+    });
+  });
+});

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireManager } from '@/lib/auth/is-manager';
+import { getSignedScreenshotUrl } from '@/lib/storage/upload';
 
 export async function GET(req: NextRequest) {
   try {
@@ -53,6 +54,8 @@ export async function GET(req: NextRequest) {
           amount,
           payment_status,
           payment_screenshot_url,
+          screenshot_object_path,
+          screenshot_bucket,
           transaction_reference,
           verification_note,
           verified_by,
@@ -143,11 +146,40 @@ export async function GET(req: NextRequest) {
       });
     });
 
-    const enrichedPlayers = filtered.map((item: any) => ({
-      ...item,
-      tournamentHistoryCount: playerHistoryMap[item.player_id]?.length || 1,
-      tournamentHistory: playerHistoryMap[item.player_id] || [],
-    }));
+    // Resolve screenshot_object_path into signed URLs for payments
+    const enrichedPlayers = await Promise.all(
+      filtered.map(async (item: any) => {
+        const history = playerHistoryMap[item.player_id] || [];
+        const enrichedPayments = item.payments
+          ? await Promise.all(
+              (item.payments as any[]).map(async (p: any) => {
+                let resolvedScreenshotUrl = p.payment_screenshot_url || '';
+                if (p.screenshot_object_path) {
+                  try {
+                    resolvedScreenshotUrl = await getSignedScreenshotUrl(
+                      p.screenshot_bucket || 'payment-screenshots',
+                      p.screenshot_object_path,
+                      900
+                    );
+                  } catch {
+                    // Keep fallback URL if signed URL generation fails
+                  }
+                }
+                return {
+                  ...p,
+                  payment_screenshot_url: resolvedScreenshotUrl,
+                };
+              })
+            )
+          : item.payments;
+        return {
+          ...item,
+          payments: enrichedPayments,
+          tournamentHistoryCount: history.length || 1,
+          tournamentHistory: history,
+        };
+      })
+    );
 
     return NextResponse.json({
       players: enrichedPlayers,

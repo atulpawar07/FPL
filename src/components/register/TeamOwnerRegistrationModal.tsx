@@ -15,6 +15,7 @@ import {
   UserCheck,
   Shield,
   Star,
+  QrCode,
 } from 'lucide-react';
 
 interface TeamOwnerRegistrationModalProps {
@@ -359,31 +360,96 @@ export const TeamOwnerRegistrationModal: React.FC<TeamOwnerRegistrationModalProp
                 ℹ️ Organiser will verify payment offline. Your registration will enter <strong>PENDING</strong> review queue for Organiser acknowledgement.
               </div>
             ) : (
-              <div className="flex items-center gap-4 p-3 bg-slate-950 rounded-xl border border-slate-800">
-                {screenshotBase64 ? (
-                  <img
-                    src={screenshotBase64}
-                    alt="Payment Screenshot"
-                    className="w-16 h-16 object-contain rounded bg-slate-900 border border-emerald-500"
-                  />
-                ) : (
-                  <div className="w-16 h-16 bg-slate-800 rounded flex items-center justify-center text-slate-500">
-                    <ImageIcon className="w-6 h-6" />
+              <div className="space-y-4">
+                {/* QR Code + UPI ID Section */}
+                <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <QrCode className="w-5 h-5 text-emerald-400" />
+                    <h4 className="font-bold text-white text-xs">UPI Payment Details</h4>
                   </div>
-                )}
-                <div className="flex-1 space-y-1">
-                  <label className="cursor-pointer px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 inline-block">
-                    Upload Payment Proof ({totalClubbedFeeDisplay})
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleScreenshotUpload}
+                  <p className="text-[11px] text-slate-400">
+                    Scan the QR code using your UPI app and pay <strong className="text-amber-300">{totalClubbedFeeDisplay}</strong> (Owner + Icon combined fee).
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                    {/* QR Code Image */}
+                    <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl text-slate-950 text-center space-y-2">
+                      {tournament?.payment_qr_url ? (
+                        <img
+                          src={tournament.payment_qr_url}
+                          alt="UPI QR Code"
+                          className="w-36 h-36 object-contain"
+                        />
+                      ) : (
+                        <div className="w-36 h-36 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 font-mono text-center text-xs p-2 border border-slate-300">
+                          QR Code Not Available<br />
+                          Pay using UPI ID below
+                        </div>
+                      )}
+                      <span className="text-[11px] font-bold text-slate-700">
+                        Total: {totalClubbedFeeDisplay}
+                      </span>
+                    </div>
+
+                    {/* UPI ID + Deep Links */}
+                    <div className="space-y-3">
+                      <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">UPI ID</span>
+                        <span className="font-mono font-bold text-emerald-400 text-sm">
+                          {tournament?.upi_id || 'Not configured'}
+                        </span>
+                      </div>
+
+                      {tournament?.upi_id && (
+                        <div className="space-y-1.5">
+                          <span className="text-slate-400 font-bold block text-[10px]">Pay via UPI App:</span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <a
+                              href={`upi://pay?pa=${encodeURIComponent(tournament.upi_id)}&pn=Tournament&am=${totalClubbedFeePaise / 100}&cu=INR`}
+                              className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-semibold text-center text-[10px] transition-colors border border-slate-700"
+                            >
+                              GPay / PhonePe
+                            </a>
+                            <a
+                              href={`upi://pay?pa=${encodeURIComponent(tournament.upi_id)}&pn=Tournament&am=${totalClubbedFeePaise / 100}&cu=INR`}
+                              className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-semibold text-center text-[10px] transition-colors border border-slate-700"
+                            >
+                              Paytm / BHIM
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Screenshot Upload */}
+                <div className="flex items-center gap-4 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  {screenshotBase64 ? (
+                    <img
+                      src={screenshotBase64}
+                      alt="Payment Screenshot"
+                      className="w-16 h-16 object-contain rounded bg-slate-900 border border-emerald-500"
                     />
-                  </label>
-                  <span className="text-[10px] text-slate-400 block">
-                    Attach UPI transaction receipt for admin verification.
-                  </span>
+                  ) : (
+                    <div className="w-16 h-16 bg-slate-800 rounded flex items-center justify-center text-slate-500">
+                      <ImageIcon className="w-6 h-6" />
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-1">
+                    <label className="cursor-pointer px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 inline-block">
+                      Upload Payment Proof ({totalClubbedFeeDisplay})
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleScreenshotUpload}
+                      />
+                    </label>
+                    <span className="text-[10px] text-slate-400 block">
+                      After payment, upload your UPI transaction receipt for admin verification.
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
