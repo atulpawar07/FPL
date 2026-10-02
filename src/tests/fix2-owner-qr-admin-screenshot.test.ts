@@ -40,32 +40,34 @@ describe('Fix #2 — Owner QR + Admin Screenshot Regression', () => {
   // FIX A — OWNER MODAL QR/UPI RENDERING
   // ========================================================
   describe('Fix A — Owner Modal Payment QR/UPI Display', () => {
+    const modalPath = path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx');
+    const upiChoicePath = path.join(process.cwd(), 'src/components/ui/UPIPaymentChoice.tsx');
+    const upiUtilsPath = path.join(process.cwd(), 'src/lib/utils/upi.ts');
+
+    const getCombinedSource = () => {
+      const modal = fs.readFileSync(modalPath, 'utf-8');
+      const upiChoice = fs.existsSync(upiChoicePath) ? fs.readFileSync(upiChoicePath, 'utf-8') : '';
+      const upiUtils = fs.existsSync(upiUtilsPath) ? fs.readFileSync(upiUtilsPath, 'utf-8') : '';
+      return modal + '\n' + upiChoice + '\n' + upiUtils;
+    };
 
     it('1. Owner modal renders tournament.payment_qr_url as QR image', () => {
-      const source = fs.readFileSync(
-        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
-        'utf-8'
-      );
+      const source = getCombinedSource();
 
-      // Must contain an <img> tag with tournament payment_qr_url
+      // Must contain tournament payment_qr_url and QR alt text
       expect(source).toContain('tournament?.payment_qr_url');
       expect(source).toContain('alt="UPI QR Code"');
     });
 
     it('2. Owner modal displays tournament.upi_id when available', () => {
-      const source = fs.readFileSync(
-        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
-        'utf-8'
-      );
+      const source = getCombinedSource();
 
-      expect(source).toContain("tournament?.upi_id || 'Not configured'");
+      expect(source).toContain('tournament?.upi_id');
+      expect(source).toMatch(/Not configured|not configured/i);
     });
 
     it('3. Owner modal provides UPI deep links for GPay/PhonePe/Paytm', () => {
-      const source = fs.readFileSync(
-        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
-        'utf-8'
-      );
+      const source = getCombinedSource();
 
       expect(source).toContain('upi://pay?pa=');
       expect(source).toContain('GPay / PhonePe');
@@ -73,24 +75,18 @@ describe('Fix #2 — Owner QR + Admin Screenshot Regression', () => {
     });
 
     it('4. Owner modal screenshot upload remains available for UPI payment', () => {
-      const source = fs.readFileSync(
-        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
-        'utf-8'
-      );
+      const modalSource = fs.readFileSync(modalPath, 'utf-8');
 
       // Screenshot upload section must exist within UPI_QR flow
-      expect(source).toContain('Upload Payment Proof');
-      expect(source).toContain('handleScreenshotUpload');
+      expect(modalSource).toContain('Upload Payment Proof');
+      expect(modalSource).toContain('handleScreenshotUpload');
     });
 
     it('5. Acknowledge by Organiser does not require screenshot', () => {
-      const source = fs.readFileSync(
-        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
-        'utf-8'
-      );
+      const modalSource = fs.readFileSync(modalPath, 'utf-8');
 
       // ACKNOWLEDGE_BY_ORGANISER section must NOT contain screenshot upload
-      const ackSection = source.match(
+      const ackSection = modalSource.match(
         /paymentMethod === 'ACKNOWLEDGE_BY_ORGANISER'[\s\S]*?Organiser will verify payment offline[\s\S]*?<\/div>/
       );
       expect(ackSection).toBeTruthy();
@@ -100,22 +96,16 @@ describe('Fix #2 — Owner QR + Admin Screenshot Regression', () => {
     });
 
     it('6. Owner modal imports QrCode icon', () => {
-      const source = fs.readFileSync(
-        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
-        'utf-8'
-      );
+      const source = getCombinedSource();
 
       expect(source).toContain('QrCode');
     });
 
     it('7. Owner modal shows combined fee in QR section', () => {
-      const source = fs.readFileSync(
-        path.join(process.cwd(), 'src/components/register/TeamOwnerRegistrationModal.tsx'),
-        'utf-8'
-      );
+      const modalSource = fs.readFileSync(modalPath, 'utf-8');
 
-      expect(source).toContain('totalClubbedFeeDisplay');
-      expect(source).toContain('Owner + Icon combined fee');
+      expect(modalSource).toContain('totalClubbedFeeDisplay');
+      expect(modalSource).toContain('Owner + Icon combined fee');
     });
   });
 

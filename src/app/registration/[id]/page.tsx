@@ -12,6 +12,7 @@ import { formatPaiseToINR, formatDate, cricketRoleLabels } from '@/lib/utils/for
 import { FullPlayerRegistrationProfile } from '@/types';
 import { Trophy, CheckCircle2, Clock, QrCode, ArrowLeft, Printer, ShieldCheck, Edit3, Upload, Image as ImageIcon, ShieldAlert, Check } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
+import { UPIPaymentChoice } from '@/components/ui/UPIPaymentChoice';
 
 export default function RegistrationDetailsPage() {
   const params = useParams();
@@ -305,77 +306,21 @@ export default function RegistrationDetailsPage() {
 
                 {/* Manual UPI Payment Instructions & QR Display */}
                 {data.tournament.payment_enabled && (
-                  <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-                      <div>
-                        <h4 className="font-bold text-white text-sm flex items-center gap-2">
-                          <QrCode className="w-5 h-5 text-emerald-400" />
-                          <span>Manual UPI Payment Details</span>
-                        </h4>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Scan the admin UPI QR code or pay via any UPI app using the details below.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-400">Payment Status:</span>
-                        <Badge status={data.payment?.payment_status || 'PENDING'}>
-                          {data.payment?.payment_status === 'SUCCESSFUL' ? 'Paid (Verified)' : 'Pending Verification'}
-                        </Badge>
-                      </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+                      <span className="text-xs font-bold text-slate-400">Payment Verification Status:</span>
+                      <Badge status={data.payment?.payment_status || 'PENDING'}>
+                        {data.payment?.payment_status === 'SUCCESSFUL' ? 'Paid (Verified)' : 'Pending Verification'}
+                      </Badge>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                      {/* QR Code Graphic Display */}
-                      <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl text-slate-950 text-center space-y-2">
-                        {data.tournament.payment_qr_url ? (
-                          <img
-                            src={data.tournament.payment_qr_url}
-                            alt="Admin UPI QR Code"
-                            className="w-44 h-44 object-contain"
-                          />
-                        ) : (
-                          <div className="w-44 h-44 bg-slate-950 rounded-xl flex items-center justify-center text-emerald-400 font-mono text-center text-xs p-2">
-                            UPI QR CODE<br />
-                            {formatPaiseToINR(data.tournament.registration_fee)}
-                          </div>
-                        )}
-                        <span className="text-xs font-bold text-slate-800">
-                          Registration Fee: {formatPaiseToINR(data.tournament.registration_fee)}
-                        </span>
-                      </div>
-
-                      {/* UPI ID & Intent Links */}
-                      <div className="space-y-3 text-xs">
-                        <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Admin UPI ID</span>
-                          <span className="font-mono font-bold text-emerald-400 text-sm">
-                            {data.tournament.upi_id || 'organizer@upi'}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1.5 no-print">
-                          <span className="text-slate-400 font-bold block text-[11px]">Pay via UPI App:</span>
-                          <div className="grid grid-cols-2 gap-2">
-                            <a
-                              href={`upi://pay?pa=${encodeURIComponent(data.tournament.upi_id || 'organizer@upi')}&pn=Tournament&am=${data.tournament.registration_fee / 100}&cu=INR`}
-                              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold text-center transition-colors border border-slate-700"
-                            >
-                              GPay / PhonePe
-                            </a>
-                            <a
-                              href={`upi://pay?pa=${encodeURIComponent(data.tournament.upi_id || 'organizer@upi')}&pn=Tournament&am=${data.tournament.registration_fee / 100}&cu=INR`}
-                              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold text-center transition-colors border border-slate-700"
-                            >
-                              Paytm / BHIM
-                            </a>
-                          </div>
-                        </div>
-
-                        <p className="text-[11px] text-slate-400 italic">
-                          * Note: Payment status will be updated to "Paid" once verified by the tournament administrator.
-                        </p>
-                      </div>
-                    </div>
+                    <UPIPaymentChoice
+                      upiId={data.tournament.upi_id}
+                      payeeName={data.tournament.name}
+                      amountPaise={data.tournament.registration_fee}
+                      referenceNote={`Reg ${data.registration.registration_number}`}
+                      qrUrlFallback={data.tournament.payment_qr_url}
+                    />
 
                     {/* PAYMENT SCREENSHOT UPLOAD FORM (STEP 1 AUTOMATED VERIFICATION) */}
                     <div className="pt-4 border-t border-slate-800 space-y-4 no-print">
