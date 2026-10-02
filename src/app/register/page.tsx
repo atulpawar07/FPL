@@ -43,67 +43,73 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Auth Listener & User Profile Prefill
+  // Parallel Auth, Profile, and Tournament Initial Loading
   useEffect(() => {
-    const handleUser = (user: any) => {
-      if (user) {
-        setCurrentUser(user);
-        const defaultName = (user.email || '')
-          .split('@')[0]
-          .replace(/[._-]/g, ' ')
-          .replace(/\b\w/g, (c: string) => c.toUpperCase());
+    let isMounted = true;
 
-        setPersonalData((prev) => ({
-          ...prev,
-          fullName: defaultName,
-          email: user.email || '',
-        }));
+    const loadInitialData = async () => {
+      try {
+        const [authRes, tournamentsRes, profileRes] = await Promise.all([
+          supabase.auth.getUser().catch(() => ({ data: { user: null } })),
+          fetch('/api/tournaments/upcoming').then((res) => res.json()).catch(() => ({})),
+          fetch('/api/players/profile').then((res) => res.json()).catch(() => ({})),
+        ]);
 
-        fetch('/api/players/profile')
-          .then((res) => res.json())
-          .then((pData) => {
-            if (pData.player) {
-              setPersonalData((prev) => ({
-                ...prev,
-                fullName: pData.player.full_name || defaultName,
-                email: pData.player.email || user.email || '',
-                profilePhotoPath: pData.player.profile_image_url || '',
-              }));
-              setCricketData((prev) => ({
-                ...prev,
-                primaryRole: pData.player.cricket_role || 'BATSMAN',
-                battingStyle: pData.player.batting_style || 'RIGHT_HAND',
-                jerseySize: pData.player.jersey_size || 'M',
-              }));
-            }
-          })
-          .catch(() => {});
-      } else {
-        setCurrentUser(null);
-      }
-      setCheckingAuth(false);
-    };
+        if (!isMounted) return;
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      handleUser(user);
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      handleUser(session?.user || null);
-    });
-
-    // Fetch real upcoming tournament created by admin
-    fetch('/api/tournaments/upcoming')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.tournaments && data.tournaments.length > 0) {
-          const openT = data.tournaments.find((t: any) => t.registration_open) || data.tournaments[0];
+        // 1. Process Tournament Data
+        if (tournamentsRes?.tournaments && Array.isArray(tournamentsRes.tournaments)) {
+          const openT = tournamentsRes.tournaments.find((t: any) => t.registration_open) || tournamentsRes.tournaments[0];
           setActiveTournament(openT);
         }
-      })
-      .catch(() => {});
+
+        // 2. Process Auth & Profile Data
+        const user = authRes?.data?.user || null;
+        if (user) {
+          setCurrentUser(user);
+          const defaultName = (user.email || '')
+            .split('@')[0]
+            .replace(/[._-]/g, ' ')
+            .replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+          const player = profileRes?.player;
+          setPersonalData((prev) => ({
+            ...prev,
+            fullName: player?.full_name || defaultName,
+            email: player?.email || user.email || '',
+            profilePhotoPath: player?.profile_image_url || '',
+          }));
+
+          if (player) {
+            setCricketData((prev) => ({
+              ...prev,
+              primaryRole: player.cricket_role || 'BATSMAN',
+              battingStyle: player.batting_style || 'RIGHT_HAND',
+              jerseySize: player.jersey_size || 'M',
+            }));
+          }
+        } else {
+          setCurrentUser(null);
+        }
+      } catch (err) {
+        console.error('Error loading registration page data:', err);
+      } finally {
+        if (isMounted) {
+          setCheckingAuth(false);
+        }
+      }
+    };
+
+    loadInitialData();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        loadInitialData();
+      }
+    });
 
     return () => {
+      isMounted = false;
       authListener?.subscription?.unsubscribe();
     };
   }, [supabase]);
