@@ -1,49 +1,40 @@
-'use client';
-
-import React, { useEffect, useState, Suspense } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { Header } from '@/components/public/Header';
 import { Footer } from '@/components/public/Footer';
 import { Button } from '@/components/ui/Button';
 import { formatPaiseToINR, formatDate } from '@/lib/utils/format';
 import { getOrderedTournaments, isTournamentCompleted } from '@/lib/utils/tournament';
-import { DbTournament } from '@/types';
+import { getPublicTournaments } from '@/lib/data/tournaments';
 import {
   Trophy,
   Calendar,
-  DollarSign,
   UserCheck,
   Award,
   ArrowRight,
-  ShieldCheck,
   CheckCircle2,
-  Mail,
   Phone,
   Sparkles,
   Check,
   Clock,
 } from 'lucide-react';
 
-function HomePageContent() {
-  const searchParams = useSearchParams();
-  const isSubmitted = searchParams.get('submitted') === 'true';
-  const submittedTournamentName = searchParams.get('tName') || 'FairPlay Premier League';
+export const revalidate = 60; // Revalidate public homepage every 60 seconds
 
-  const [tournaments, setTournaments] = useState<DbTournament[]>([]);
-  const [loadingTournaments, setLoadingTournaments] = useState(true);
+interface HomePageProps {
+  searchParams: Promise<{
+    submitted?: string;
+    tName?: string;
+  }>;
+}
 
-  useEffect(() => {
-    fetch('/api/tournaments/upcoming')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.tournaments && Array.isArray(data.tournaments)) {
-          setTournaments(data.tournaments);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingTournaments(false));
-  }, []);
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const resolvedParams = await searchParams;
+  const isSubmitted = resolvedParams?.submitted === 'true';
+  const submittedTournamentName = resolvedParams?.tName || 'FairPlay Premier League';
+
+  const tournaments = await getPublicTournaments();
 
   // Ordered by created_at DESC — latest created tournament is always first/hero.
   // Past tournaments remain in the list; isTournamentCompleted() drives display-only badges.
@@ -126,18 +117,24 @@ function HomePageContent() {
                 <div className="w-full rounded-3xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl relative group">
                   {activeTournament?.banner_url ? (
                     <div className="relative w-full flex items-center justify-center bg-slate-950 overflow-hidden min-h-[220px] sm:min-h-[300px]">
-                      {/* Ambient background glow */}
-                      <img
+                      {/* Ambient background glow image */}
+                      <Image
                         src={activeTournament.banner_url}
                         alt=""
                         aria-hidden="true"
+                        width={800}
+                        height={420}
                         className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-25 scale-110 pointer-events-none"
                       />
-                      {/* Uncropped main banner image */}
-                      <img
+                      {/* Optimized main hero banner image */}
+                      <Image
                         src={activeTournament.banner_url}
                         alt={activeTournament.name}
+                        width={800}
+                        height={420}
+                        priority
                         className="w-full h-auto max-h-[420px] object-contain relative z-10 group-hover:scale-[1.01] transition-transform duration-500"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 800px"
                       />
                     </div>
                   ) : (
@@ -330,9 +327,7 @@ function HomePageContent() {
             </p>
           </div>
 
-          {loadingTournaments ? (
-            <div className="p-12 text-center text-slate-400">Loading tournaments...</div>
-          ) : orderedTournaments.length === 0 ? (
+          {orderedTournaments.length === 0 ? (
             <div className="p-8 bg-slate-900 border border-slate-800 rounded-3xl text-center space-y-4 shadow-xl">
               <Trophy className="w-12 h-12 text-emerald-400 mx-auto" />
               <div className="space-y-1">
@@ -548,13 +543,5 @@ function HomePageContent() {
 
       <Footer />
     </div>
-  );
-}
-
-export default function HomePage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">Loading home...</div>}>
-      <HomePageContent />
-    </Suspense>
   );
 }

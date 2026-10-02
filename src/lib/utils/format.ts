@@ -57,6 +57,7 @@ export const registrationStatusLabels: Record<RegistrationStatus, string> = {
   CANCELLED: 'Cancelled',
   PENDING: 'Pending Review',
   REJECTED: 'Rejected',
+  CORRECTION_REQUESTED: 'Correction Required',
 };
 
 /**
