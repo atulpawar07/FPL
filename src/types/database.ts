@@ -3,7 +3,7 @@ export type TournamentType = 'OWNER_BASED' | 'NON_OWNER_BASED';
 export type CricketRole = 'BATSMAN' | 'BOWLER' | 'ALL_ROUNDER' | 'BATSMAN_WICKETKEEPER' | 'BOWLER_WICKETKEEPER';
 export type BattingStyle = 'RIGHT_HAND' | 'LEFT_HAND';
 export type JerseySize = 'S' | 'M' | 'L' | 'XL' | 'XXL' | '3XL';
-export type RegistrationStatus = 'CONFIRMED' | 'WAITING_LIST' | 'CANCELLED' | 'PENDING' | 'REJECTED';
+export type RegistrationStatus = 'CONFIRMED' | 'WAITING_LIST' | 'CANCELLED' | 'PENDING' | 'REJECTED' | 'CORRECTION_REQUESTED';
 export type PaymentStatus = 'PENDING' | 'AWAITING_ORGANISER_ACKNOWLEDGEMENT' | 'SUCCESSFUL' | 'FAILED' | 'REFUNDED' | 'CREATED' | 'PROCESSING' | 'CANCELLED';
 export type PaymentMethod = 'UPI_QR' | 'UPI' | 'ACKNOWLEDGE_BY_ORGANISER' | 'MANUAL_MOCK';
 
@@ -109,6 +109,16 @@ export interface DbRegistration {
   registered_batting_style_snapshot: BattingStyle | null;
   registered_jersey_size_snapshot: JerseySize | null;
   registered_image_snapshot: string;
+  admin_remarks?: string | null;
+  correction_history?: Array<{
+    remark: string;
+    requested_at: string;
+    resolved_at?: string | null;
+    resolved_by_auth_id?: string | null;
+    [key: string]: any;
+  }> | null;
+  resubmission_count?: number;
+  correction_requested_at?: string | null;
   registered_at: string;
   updated_at: string;
 }
@@ -131,3 +141,18 @@ export interface DbPayment {
   updated_at: string;
 }
 
+export type NotificationType = 'CORRECTION_REQUIRED' | 'REGISTRATION_CONFIRMED' | 'REGISTRATION_REJECTED' | string;
+
+export interface DbNotification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  registration_id?: string | null;
+  tournament_id?: string | null;
+  payment_id?: string | null;
+  read_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
