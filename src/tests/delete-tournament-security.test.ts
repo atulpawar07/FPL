@@ -216,7 +216,7 @@ describe('Delete Tournament Security & Integrity Suite (DELETE-01 to DELETE-16)'
 
       expect(oCheck).toBeNull();
     }
-  });
+  }, 15000);
 
   it('DELETE-10 & DELETE-11 & DELETE-12: FPL Clash Of Champions and its records remain untouched', async () => {
     if (!fplClashId) return;

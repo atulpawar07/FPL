@@ -150,6 +150,8 @@ export async function POST(
       await supabase.from('payments').insert({
         registration_id: registrationId,
         amount: 50000,
+        owner_fee_paise: 0,
+        player_fee_paise: 50000,
         payment_method: 'UPI_QR',
         payment_status: newPaymentStatus,
         transaction_reference: transactionReference || `${role}-${action}-${Date.now()}`,
@@ -163,6 +165,50 @@ export async function POST(
     const cascadeMsg = registration.team_owner_id
       ? ` (cascaded to linked Owner/Icon registrations)`
       : '';
+
+    // Send notification to player if auth_user_id is available
+    try {
+      const { data: playerInfo } = await supabase
+        .from('players')
+        .select('auth_user_id')
+        .eq('id', registration.player_id)
+        .maybeSingle();
+
+      if (playerInfo?.auth_user_id) {
+        const { sendNotification } = await import('@/lib/notifications/create-notification');
+        if (action === 'PAYMENT_PENDING') {
+          const reason = verificationNote || 'Payment screenshot is not clear or missing transaction details.';
+          await sendNotification({
+            userId: playerInfo.auth_user_id,
+            type: 'CORRECTION_REQUIRED',
+            title: 'Payment Screenshot Requires Attention',
+            message: `Your payment screenshot could not be verified because ${reason}. Please upload a clear payment screenshot showing the transaction details.`,
+            registrationId,
+            tournamentId: registration.tournament_id,
+          });
+        } else if (newStatus === 'CONFIRMED') {
+          await sendNotification({
+            userId: playerInfo.auth_user_id,
+            type: 'REGISTRATION_CONFIRMED',
+            title: 'Registration Confirmed',
+            message: 'Your registration and payment have been verified and confirmed! Welcome to the tournament.',
+            registrationId,
+            tournamentId: registration.tournament_id,
+          });
+        } else if (newStatus === 'REJECTED') {
+          await sendNotification({
+            userId: playerInfo.auth_user_id,
+            type: 'REGISTRATION_REJECTED',
+            title: 'Registration Rejected',
+            message: `Your registration payment was rejected. Reason: ${verificationNote || 'Invalid transaction'}`,
+            registrationId,
+            tournamentId: registration.tournament_id,
+          });
+        }
+      }
+    } catch (notifErr: any) {
+      console.warn('Player notification warning:', notifErr.message);
+    }
 
     const auditActionName = action === 'ACKNOWLEDGE_AND_APPROVE' ? 'ACKNOWLEDGE_ORGANISER_PAYMENT' : 'UPDATE_REGISTRATION_STATUS';
 

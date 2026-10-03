@@ -119,12 +119,39 @@ export async function POST(
       let { error: insertErr } = await supabase.from('payments').insert({
         registration_id: registrationId,
         amount: 50000,
+        owner_fee_paise: 0,
+        player_fee_paise: 50000,
         payment_method: 'UPI_QR',
         ...paymentPayload,
       });
       if (insertErr) {
         return NextResponse.json({ error: `Failed to create payment record: ${insertErr.message}` }, { status: 500 });
       }
+    }
+
+    // Ensure registration_status is set to PENDING for admin verification queue
+    await supabase
+      .from('registrations')
+      .update({
+        registration_status: 'PENDING',
+        status: 'PENDING',
+        updated_at: nowIso,
+      })
+      .eq('id', registrationId);
+
+    // Send confirmation notification to user
+    try {
+      const { sendNotification } = await import('@/lib/notifications/create-notification');
+      await sendNotification({
+        userId: user.id,
+        type: 'REPLACEMENT_SCREENSHOT_SUBMITTED',
+        title: 'Replacement Screenshot Received',
+        message: 'Your replacement payment screenshot has been uploaded and queued for admin verification.',
+        registrationId,
+        tournamentId: registration.tournament_id,
+      });
+    } catch (notifErr: any) {
+      console.warn('Notification warning:', notifErr.message);
     }
 
     return NextResponse.json({

@@ -334,6 +334,25 @@ export default function RegistrationDetailsPage() {
                         </p>
                       </div>
 
+                      {/* ADMIN RE-UPLOAD REQUEST REASON BANNER */}
+                      {data.payment?.verification_note && (data.payment.payment_status === 'PENDING' || (data.registration.registration_status as string) === 'CORRECTION_REQUESTED') && (
+                        <div className="p-4 bg-amber-950/90 border border-amber-500/50 rounded-2xl text-amber-200 text-xs sm:text-sm space-y-2 shadow-xl animate-fadeIn">
+                          <div className="flex items-center gap-2 font-bold text-amber-400 text-sm">
+                            <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0" />
+                            <span>Payment Verification Required</span>
+                          </div>
+                          <div>
+                            <span className="font-semibold block text-slate-200 text-xs">Reason:</span>
+                            <p className="text-amber-200 bg-slate-950/80 p-3 rounded-xl border border-amber-500/30 text-xs mt-1">
+                              {data.payment.verification_note}
+                            </p>
+                          </div>
+                          <p className="text-[11px] text-amber-300/80">
+                            Please attach a clear payment receipt screenshot showing the full transaction reference and date below.
+                          </p>
+                        </div>
+                      )}
+
                       {uploadError && (
                         <div className="p-3 bg-rose-950/80 border border-rose-500/50 rounded-xl text-rose-300 text-xs flex items-center gap-2">
                           <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />

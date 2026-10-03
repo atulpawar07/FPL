@@ -101,6 +101,8 @@ export async function POST(req: NextRequest) {
     await supabase.from('payments').insert({
       registration_id: registration.id,
       amount: amountPaise,
+      owner_fee_paise: registration.registration_type === 'OWNER' ? (tournament?.owner_registration_fee || 0) : 0,
+      player_fee_paise: tournament?.registration_fee || 50000,
       payment_method: 'UPI_QR',
       payment_status: 'PENDING',
     });

@@ -237,6 +237,8 @@ export async function POST(
     await supabaseAdmin.from('payments').insert({
       registration_id: newRegistration.id,
       amount: tournament.registration_fee,
+      owner_fee_paise: 0,
+      player_fee_paise: tournament.registration_fee,
       payment_method: 'UPI_QR',
       payment_status: 'PENDING',
     });
