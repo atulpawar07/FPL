@@ -102,15 +102,13 @@ export async function POST(
       screenshot_bucket: screenshotBucket,
       screenshot_object_path: screenshotObjectPath,
       transaction_reference: cleanTxnRef || `UPI-${Date.now().toString().slice(-8)}`,
-      screenshot_uploaded_at: nowIso,
-
       payment_status: 'PENDING',
       verification_note: `1st Step Automated Validation Passed. Awaiting Step 2 Admin Approval.`,
       updated_at: nowIso,
     };
 
     if (existingPayment) {
-      const { error: updateErr } = await supabase
+      let { error: updateErr } = await supabase
         .from('payments')
         .update(paymentPayload)
         .eq('id', existingPayment.id);
@@ -118,7 +116,7 @@ export async function POST(
         return NextResponse.json({ error: `Failed to update payment record: ${updateErr.message}` }, { status: 500 });
       }
     } else {
-      const { error: insertErr } = await supabase.from('payments').insert({
+      let { error: insertErr } = await supabase.from('payments').insert({
         registration_id: registrationId,
         amount: 50000,
         payment_method: 'UPI_QR',
