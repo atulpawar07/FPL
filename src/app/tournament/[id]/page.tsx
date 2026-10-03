@@ -647,9 +647,9 @@ export default function PublicTournamentPage() {
                     }`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          {myEntry.registered_image_snapshot ? (
+                          {myEntry.registered_image_snapshot || profileImageUrl ? (
                             <img
-                              src={myEntry.registered_image_snapshot}
+                              src={myEntry.registered_image_snapshot || profileImageUrl}
                               alt="Your Photo"
                               className={`w-12 h-12 rounded-full object-cover border-2 shrink-0 ${
                                 isConfirmedStatus ? 'border-emerald-500' : 'border-amber-500'

@@ -44,6 +44,8 @@ export async function GET() {
 
       return {
         ...t,
+        banner_url: t.banner_url?.startsWith('data:image/') ? '/logo.png' : t.banner_url,
+        payment_qr_url: t.payment_qr_url?.startsWith('data:image/') ? '/images/qr/titusalex786.png' : t.payment_qr_url,
         stats: {
           totalRegistered: tRegs.length,
           confirmedCount,

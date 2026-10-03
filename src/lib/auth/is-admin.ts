@@ -1,8 +1,8 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { ADMIN_EMAIL } from './constants';
+import { ADMIN_EMAIL, ADMIN_EMAILS, isAuthorizedAdminEmail } from './constants';
 
-export { ADMIN_EMAIL };
+export { ADMIN_EMAIL, ADMIN_EMAILS, isAuthorizedAdminEmail };
 
 export async function checkIsAdmin() {
   const supabase = await createServerSupabaseClient();

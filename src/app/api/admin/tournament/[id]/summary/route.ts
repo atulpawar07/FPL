@@ -36,13 +36,11 @@ export async function GET(
           registered_role_snapshot,
           registered_batting_style_snapshot,
           registered_jersey_size_snapshot,
-          registered_image_snapshot,
           registered_at,
           players (
             id,
             full_name,
-            email,
-            profile_image_url
+            email
           )
         `)
         .eq('tournament_id', tournamentId)
@@ -141,7 +139,7 @@ export async function GET(
       const effectiveStatus = r.registration_status || r.status || 'PENDING';
       return {
         ...r,
-        registered_image_snapshot: resolveImageUrl(r.registered_image_snapshot, 'profile-images', '/logo.png'),
+        registered_image_snapshot: '/logo.png',
         registration_status: effectiveStatus,
         status: effectiveStatus,
         payment,

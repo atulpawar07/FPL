@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { tournamentRegistrationSchema } from '@/lib/validation/registration';
 import { generateRegistrationReference } from '@/lib/utils/format';
+import { uploadToStorageBucket } from '@/lib/storage/upload';
 
 export async function POST(
   req: NextRequest,
@@ -56,6 +57,26 @@ export async function POST(
       return NextResponse.json({ error: 'Registration for this tournament is currently closed.' }, { status: 400 });
     }
 
+    // Automatically store uploaded Base64 image in profile-images bucket
+    let finalProfileImageUrl = data.profileImageUrl;
+    if (data.profileImageUrl && data.profileImageUrl.startsWith('data:image/')) {
+      try {
+        const match = data.profileImageUrl.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+        if (match) {
+          const rawExt = match[1].toLowerCase();
+          const ext = rawExt === 'jpeg' ? 'jpg' : rawExt;
+          const buffer = Buffer.from(match[2], 'base64');
+          const objectPath = `player-${user.id}-${Date.now()}.${ext}`;
+          const uploadRes = await uploadToStorageBucket('profile-images', objectPath, buffer);
+          if (uploadRes.publicUrl) {
+            finalProfileImageUrl = uploadRes.publicUrl;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('Storage upload fallback for profile image:', uploadErr);
+      }
+    }
+
     let player: any = null;
 
     if (isRegisteringOther) {
@@ -64,7 +85,7 @@ export async function POST(
       const newPlayerPayload: any = {
         full_name: data.fullName,
         email: participantEmail,
-        profile_image_url: data.profileImageUrl,
+        profile_image_url: finalProfileImageUrl,
         cricket_role: data.cricketRole,
         batting_style: data.battingStyle || null,
         is_tournament_only: true,
@@ -90,7 +111,7 @@ export async function POST(
         auth_user_id: user.id,
         full_name: data.fullName,
         email: user.email!,
-        profile_image_url: data.profileImageUrl,
+        profile_image_url: finalProfileImageUrl,
         cricket_role: data.cricketRole,
         batting_style: data.battingStyle || null,
         jersey_size: data.jerseySize || null,
@@ -184,7 +205,7 @@ export async function POST(
       registered_role_snapshot: data.cricketRole,
       registered_batting_style_snapshot: data.battingStyle || null,
       registered_jersey_size_snapshot: data.jerseySize || null,
-      registered_image_snapshot: data.profileImageUrl,
+      registered_image_snapshot: finalProfileImageUrl,
     };
 
     let { data: newRegistration, error: regErr } = await supabaseAdmin

@@ -38,7 +38,6 @@ export async function GET(req: NextRequest) {
         registered_role_snapshot,
         registered_batting_style_snapshot,
         registered_jersey_size_snapshot,
-        registered_image_snapshot,
         registered_at,
         player:players (
           id,
@@ -174,6 +173,7 @@ export async function GET(req: NextRequest) {
           : item.payments;
         return {
           ...item,
+          registered_image_snapshot: '/logo.png',
           payments: enrichedPayments,
           tournamentHistoryCount: history.length || 1,
           tournamentHistory: history,

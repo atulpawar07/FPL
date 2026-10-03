@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { ShieldCheck, Mail, Lock, AlertCircle, LogIn } from 'lucide-react';
-import { ADMIN_EMAIL } from '@/lib/auth/constants';
+import { ADMIN_EMAIL, isAuthorizedAdminEmail } from '@/lib/auth/constants';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -22,8 +22,8 @@ export default function AdminLoginPage() {
     setIsLoading(true);
     setError(null);
 
-    if (email.trim().toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-      setError(`Access Denied: Admin access is restricted strictly to ${ADMIN_EMAIL}`);
+    if (!isAuthorizedAdminEmail(email)) {
+      setError('Access Denied: Admin access is restricted to authorized administrators.');
       setIsLoading(false);
       return;
     }
@@ -39,10 +39,10 @@ export default function AdminLoginPage() {
       return;
     }
 
-    if (data?.user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+    if (isAuthorizedAdminEmail(data?.user?.email)) {
       window.location.href = '/admin';
     } else {
-      setError(`Access Denied: Only ${ADMIN_EMAIL} is authorized as Admin.`);
+      setError(`Access Denied: ${data?.user?.email || 'User'} is not authorized as Admin.`);
       setIsLoading(false);
     }
   };
@@ -71,7 +71,7 @@ export default function AdminLoginPage() {
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Admin Portal Login</h1>
             <p className="text-xs text-slate-400 mt-1">
-              Protected authentication reserved exclusively for <span className="text-emerald-400 font-semibold">{ADMIN_EMAIL}</span>
+              Protected authentication reserved for verified administrators.
             </p>
           </div>
         </div>

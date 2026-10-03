@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Trophy, Menu, X, ShieldCheck, User, LogOut, LogIn, UserCheck, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase/client';
-import { ADMIN_EMAIL } from '@/lib/auth/constants';
+import { ADMIN_EMAIL, isAuthorizedAdminEmail } from '@/lib/auth/constants';
 
 export const Header: React.FC = () => {
   const router = useRouter();
@@ -31,7 +31,7 @@ export const Header: React.FC = () => {
         setDisplayName(name || user.email || 'Player');
 
         const userEmail = (user.email || '').toLowerCase();
-        if (userEmail === ADMIN_EMAIL.toLowerCase()) {
+        if (isAuthorizedAdminEmail(userEmail)) {
           setIsAdmin(true);
           setIsManager(false);
         } else {
