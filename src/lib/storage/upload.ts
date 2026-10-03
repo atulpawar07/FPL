@@ -85,7 +85,7 @@ export async function uploadToStorageBucket(
   fileData: Buffer | ArrayBuffer | Uint8Array,
   overrideContentType?: string
 ): Promise<StorageUploadResult> {
-  const allowedBuckets = ['payment-screenshots', 'team-logos', 'profile-images'];
+  const allowedBuckets = ['payment-screenshots', 'team-logos', 'profile-images', 'tournament-assets'];
   if (!allowedBuckets.includes(bucket)) {
     throw new Error(`Invalid storage bucket requested: ${bucket}`);
   }

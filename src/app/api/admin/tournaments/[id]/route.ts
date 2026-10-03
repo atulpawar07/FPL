@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdmin } from '@/lib/auth/is-admin';
 import { logAdminAction } from '@/lib/audit/logger';
 import { deleteTournamentSafely } from '@/lib/tournament/delete';
+import { processTournamentImage } from '@/lib/storage/tournament-upload';
 
 export async function GET(
   req: NextRequest,
@@ -57,7 +58,24 @@ export async function PUT(
     if (body.registrationOpen !== undefined) updatePayload.registration_open = Boolean(body.registrationOpen);
     if (body.paymentEnabled !== undefined) updatePayload.payment_enabled = Boolean(body.paymentEnabled);
     if (body.upiId !== undefined) updatePayload.upi_id = body.upiId;
-    if (body.paymentQrUrl !== undefined) updatePayload.payment_qr_url = body.paymentQrUrl;
+
+    // Process image fields: base64 → Storage upload → public URL.
+    // If either upload fails, return a controlled error — NEVER save raw base64.
+    if (body.bannerUrl !== undefined || body.paymentQrUrl !== undefined) {
+      try {
+        if (body.bannerUrl !== undefined) {
+          updatePayload.banner_url = await processTournamentImage(body.bannerUrl, id, 'banner');
+        }
+        if (body.paymentQrUrl !== undefined) {
+          updatePayload.payment_qr_url = await processTournamentImage(body.paymentQrUrl, id, 'qr');
+        }
+      } catch (imgErr: any) {
+        return NextResponse.json(
+          { error: `Image upload failed: ${imgErr.message}` },
+          { status: 400 }
+        );
+      }
+    }
 
     const { data: updatedTournament, error } = await supabase
       .from('tournaments')
