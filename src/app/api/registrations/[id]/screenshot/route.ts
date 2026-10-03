@@ -61,7 +61,7 @@ export async function POST(
     // Verify registration exists and belongs to authorized user
     const { data: registration, error: regError } = await supabase
       .from('registrations')
-      .select('id, tournament_id, player_id, registered_name_snapshot')
+      .select('id, tournament_id, player_id, registration_type, registered_name_snapshot')
       .eq('id', registrationId)
       .single();
 
@@ -116,11 +116,22 @@ export async function POST(
         return NextResponse.json({ error: `Failed to update payment record: ${updateErr.message}` }, { status: 500 });
       }
     } else {
+      const { data: tournament } = await supabase
+        .from('tournaments')
+        .select('registration_fee, owner_registration_fee')
+        .eq('id', registration.tournament_id)
+        .maybeSingle();
+
+      const isOwner = registration.registration_type === 'OWNER';
+      const playerFee = tournament?.registration_fee || 50000;
+      const ownerFee = isOwner ? (tournament?.owner_registration_fee || 0) : 0;
+      const totalAmount = playerFee + ownerFee;
+
       let { error: insertErr } = await supabase.from('payments').insert({
         registration_id: registrationId,
-        amount: 50000,
-        owner_fee_paise: 0,
-        player_fee_paise: 50000,
+        amount: totalAmount,
+        owner_fee_paise: ownerFee,
+        player_fee_paise: playerFee,
         payment_method: 'UPI_QR',
         ...paymentPayload,
       });
