@@ -33,11 +33,16 @@ export async function GET(req: NextRequest) {
 
     const paymentRecord = byObjectPath || byUrl;
     let isAuthorizedPath = false;
+    let targetPath = cleanPath;
 
     if (paymentRecord) {
       const bucket = paymentRecord.screenshot_bucket || 'payment-screenshots';
       if (bucket === 'payment-screenshots') {
         isAuthorizedPath = true;
+      }
+      
+      if (paymentRecord.screenshot_object_path) {
+        targetPath = paymentRecord.screenshot_object_path;
       }
     } else {
       // Fallback check on team_owners table
@@ -53,13 +58,19 @@ export async function GET(req: NextRequest) {
     }
 
     if (!isAuthorizedPath) {
-      return NextResponse.json({ error: 'Payment screenshot not found or unauthorized' }, { status: 404 });
+      return NextResponse.json({ error: 'Receipt reference needs reconciliation' }, { status: 404 });
+    }
+
+    // Attempt to fix legacy paths that might accidentally include the bucket name
+    if (targetPath.startsWith('payment-screenshots/')) {
+      targetPath = targetPath.substring('payment-screenshots/'.length);
     }
 
     // 2. Always generate signed URL strictly for payment-screenshots bucket with 900s expiry
-    const signedUrl = await getSignedScreenshotUrl('payment-screenshots', cleanPath, 900);
+    const signedUrl = await getSignedScreenshotUrl('payment-screenshots', targetPath, 900);
+    
     if (!signedUrl) {
-      return NextResponse.json({ error: 'Failed to generate signed screenshot URL' }, { status: 500 });
+      return NextResponse.json({ error: 'Receipt file unavailable' }, { status: 404 });
     }
 
     return NextResponse.json({ signedUrl });

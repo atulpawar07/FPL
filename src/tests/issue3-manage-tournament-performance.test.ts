@@ -141,7 +141,7 @@ describe('ISSUE #3 — Manage Tournament Performance & Hardened Security', () =>
       expect(res.status).toBe(404);
 
       const json = await res.json();
-      expect(json.error).toContain('unauthorized');
+      expect(json.error).toContain('Receipt reference needs reconciliation');
       expect(getSignedScreenshotUrl).not.toHaveBeenCalled();
     });
 
