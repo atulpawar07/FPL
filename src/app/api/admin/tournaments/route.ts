@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdmin } from '@/lib/auth/is-admin';
 import { logAdminAction } from '@/lib/audit/logger';
+import { processTournamentImage } from '@/lib/storage/tournament-upload';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -71,11 +72,35 @@ export async function POST(req: NextRequest) {
     const ownerRegistrationFeePaise = Math.round((parseFloat(ownerRegistrationFeeRupees) || 0) * 100);
     const supabaseAdmin = createAdminClient();
 
+    // Determine the tournament UUID up front.
+    // For updates (id supplied): use the existing id so Storage paths stay consistent.
+    // For creates (no id): generate a new UUID now so both the Storage path and the
+    // DB row share the same id, preventing orphaned files.
+    const tournamentId: string = id || crypto.randomUUID();
+
+    // Process images: base64 → Supabase Storage upload → public URL.
+    // IMPORTANT: no silent fallback. If upload fails, the route returns an error.
+    // The original base64 value is NEVER written to the database.
+    let resolvedBannerUrl: string | null;
+    let resolvedQrUrl: string | null;
+
+    try {
+      [resolvedBannerUrl, resolvedQrUrl] = await Promise.all([
+        processTournamentImage(bannerUrl, tournamentId, 'banner'),
+        processTournamentImage(paymentQrUrl, tournamentId, 'qr'),
+      ]);
+    } catch (imgErr: any) {
+      return NextResponse.json(
+        { error: `Image upload failed: ${imgErr.message}` },
+        { status: 400 }
+      );
+    }
+
     const tournamentData = {
       name: name.trim(),
       description: description || null,
       logo_url: logoUrl || null,
-      banner_url: bannerUrl || null,
+      banner_url: resolvedBannerUrl,
       tournament_date: tournamentDate ? new Date(tournamentDate).toISOString() : new Date().toISOString(),
       registration_end_date: registrationEndDate ? new Date(registrationEndDate).toISOString() : null,
       registration_fee: registrationFeePaise,
@@ -83,7 +108,7 @@ export async function POST(req: NextRequest) {
       registration_open: registrationOpen !== undefined ? Boolean(registrationOpen) : true,
       payment_enabled: paymentEnabled !== undefined ? Boolean(paymentEnabled) : true,
       upi_id: upiId || null,
-      payment_qr_url: paymentQrUrl || null,
+      payment_qr_url: resolvedQrUrl,
       tournament_type: tType,
       max_teams: teamsInt,
       owner_registration_fee: ownerRegistrationFeePaise,
@@ -96,6 +121,7 @@ export async function POST(req: NextRequest) {
 
     let result;
     if (id) {
+      // Update: tournamentId === id (set above)
       let { data: updated, error } = await supabaseAdmin
         .from('tournaments')
         .update(tournamentData)
@@ -119,9 +145,10 @@ export async function POST(req: NextRequest) {
       if (error) throw error;
       result = updated;
     } else {
+      // Insert: use the pre-generated tournamentId so Storage paths are consistent
       let { data: created, error } = await supabaseAdmin
         .from('tournaments')
-        .insert(tournamentData)
+        .insert({ id: tournamentId, ...tournamentData })
         .select('*')
         .single();
 
@@ -131,7 +158,7 @@ export async function POST(req: NextRequest) {
         delete (tournamentData as any).owner_is_playing_enabled;
         const fallback = await supabaseAdmin
           .from('tournaments')
-          .insert(tournamentData)
+          .insert({ id: tournamentId, ...tournamentData })
           .select('*')
           .single();
         created = fallback.data;
