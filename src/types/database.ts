@@ -131,9 +131,10 @@ export interface DbPayment {
   payment_status: PaymentStatus;
   transaction_reference: string | null;
   payment_screenshot_url?: string | null;
+  screenshot_bucket?: string | null;
+  screenshot_object_path?: string | null;
   screenshot_uploaded_at?: string | null;
   extracted_txn_id?: string | null;
-  step1_validated?: boolean | null;
   verification_note: string | null;
   verified_by: string | null;
   verified_at: string | null;

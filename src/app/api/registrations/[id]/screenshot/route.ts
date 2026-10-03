@@ -103,28 +103,37 @@ export async function POST(
       screenshot_object_path: screenshotObjectPath,
       transaction_reference: cleanTxnRef || `UPI-${Date.now().toString().slice(-8)}`,
       screenshot_uploaded_at: nowIso,
-      step1_validated: true,
+
       payment_status: 'PENDING',
       verification_note: `1st Step Automated Validation Passed. Awaiting Step 2 Admin Approval.`,
       updated_at: nowIso,
     };
 
     if (existingPayment) {
-      await supabase.from('payments').update(paymentPayload).eq('id', existingPayment.id);
+      const { error: updateErr } = await supabase
+        .from('payments')
+        .update(paymentPayload)
+        .eq('id', existingPayment.id);
+      if (updateErr) {
+        return NextResponse.json({ error: `Failed to update payment record: ${updateErr.message}` }, { status: 500 });
+      }
     } else {
-      await supabase.from('payments').insert({
+      const { error: insertErr } = await supabase.from('payments').insert({
         registration_id: registrationId,
         amount: 50000,
         payment_method: 'UPI_QR',
         ...paymentPayload,
       });
+      if (insertErr) {
+        return NextResponse.json({ error: `Failed to create payment record: ${insertErr.message}` }, { status: 500 });
+      }
     }
 
     return NextResponse.json({
       success: true,
       message: 'Payment screenshot uploaded to secure Storage and validated successfully!',
       registrationId,
-      step1Validated: true,
+
       screenshotBucket,
       screenshotObjectPath,
     });

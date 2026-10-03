@@ -37,6 +37,10 @@ export async function POST(
     } else if (action === 'ACKNOWLEDGE_AND_APPROVE') {
       newStatus = 'CONFIRMED';
       newPaymentStatus = 'SUCCESSFUL';
+    } else if (action === 'PAYMENT_PENDING') {
+      // Admin requesting player to re-upload screenshot
+      newStatus = 'PENDING';
+      newPaymentStatus = 'PENDING';
     }
 
     // Update the target registration status
@@ -137,7 +141,7 @@ export async function POST(
           payment_status: newPaymentStatus,
           transaction_reference: transactionReference || `${role}-${action}-${Date.now()}`,
           verification_note: noteText,
-          verified_by: user.email,
+          verified_by: user.id,
           verified_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -150,7 +154,7 @@ export async function POST(
         payment_status: newPaymentStatus,
         transaction_reference: transactionReference || `${role}-${action}-${Date.now()}`,
         verification_note: noteText,
-        verified_by: user.email,
+        verified_by: user.id,
         verified_at: new Date().toISOString(),
       });
     }

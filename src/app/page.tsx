@@ -11,9 +11,7 @@ import {
   Trophy,
   Calendar,
   UserCheck,
-  Award,
   ArrowRight,
-  CheckCircle2,
   Phone,
   Sparkles,
   Check,
@@ -458,51 +456,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </div>
         </section>
 
-        {/* TOURNAMENT DETAILS & RULES */}
-        <section id="tournament-info" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 scroll-mt-24">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-10 space-y-8">
-            <div className="border-b border-slate-800 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white">
-                  Tournament Guidelines & Eligibility
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                  Read the official guidelines before completing your application.
-                </p>
-              </div>
-              <Link href="/register">
-                <Button size="md">Register Now</Button>
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs sm:text-sm text-slate-300">
-              <div className="space-y-3 bg-slate-950/60 p-5 rounded-2xl border border-slate-800">
-                <h3 className="font-bold text-emerald-400 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Eligibility & Age Criteria</span>
-                </h3>
-                <ul className="space-y-2 list-disc list-inside text-slate-400">
-                  <li>Open to male & female players aged 16 years and above.</li>
-                  <li>Players must reside in the participating region / district.</li>
-                  <li>Physical fitness clearance is required prior to match day.</li>
-                </ul>
-              </div>
-
-              <div className="space-y-3 bg-slate-950/60 p-5 rounded-2xl border border-slate-800">
-                <h3 className="font-bold text-emerald-400 flex items-center gap-2">
-                  <Award className="w-4 h-4" />
-                  <span>Selection & Match Structure</span>
-                </h3>
-                <ul className="space-y-2 list-disc list-inside text-slate-400">
-                  <li>All registered players are categorized by role for team allocation.</li>
-                  <li>Tournament uses T20 format with white ball and professional colored kits.</li>
-                  <li>Match schedules and squad lists will be published on the portal.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* CONTACT SECTION */}
         <section id="contact" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 scroll-mt-24">
           <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-8">
@@ -530,11 +483,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 <span>📍 Turf Titans Location</span>
               </a>
               <a
-                href={`tel:${activeTournament?.contact_phone || '+918652526186'}`}
+                href="tel:+918433832332"
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs sm:text-sm border border-slate-700 transition-colors"
               >
                 <Phone className="w-4 h-4 text-emerald-400" />
-                <span>+91 86525 26186</span>
+                <span>+91 84338 32332</span>
               </a>
             </div>
           </div>

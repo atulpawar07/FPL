@@ -115,7 +115,7 @@ describe('Phase 3A Data Model & Migration Safety Tests', () => {
       payment_screenshot_url: 'https://example.com/ss.jpg',
       screenshot_uploaded_at: '2026-10-01T00:00:00Z',
       extracted_txn_id: '1234567890',
-      step1_validated: true,
+
       verification_note: null,
       verified_by: null,
       verified_at: null,
