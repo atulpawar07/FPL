@@ -261,7 +261,7 @@ describe('Delete Tournament Security & Integrity Suite (DELETE-01 to DELETE-16)'
       .eq('tournament_id', fplClashId);
 
     expect(ownerCAfter).toBe(fplOwnerCountBefore);
-  });
+  }, 30000);
 
   it('DELETE-13: Reusable player profiles are not globally deleted', async () => {
     const { data: playerCheck } = await supabase

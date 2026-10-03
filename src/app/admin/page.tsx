@@ -150,9 +150,26 @@ export default function AdminDashboardPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 5 * 1024 * 1024) {
+      setModalError('QR image file exceeds maximum 5 MB limit');
+      return;
+    }
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setModalError('QR image must be JPEG, PNG, or WebP format');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onloadend = () => {
-      setTPaymentQrUrl(reader.result as string);
+      const result = reader.result as string;
+      if (result && result.startsWith('data:image/')) {
+        setTPaymentQrUrl(result);
+        setModalError(null);
+      } else {
+        setModalError('Failed to encode QR image as data URI');
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -161,9 +178,26 @@ export default function AdminDashboardPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 5 * 1024 * 1024) {
+      setModalError('Banner image file exceeds maximum 5 MB limit');
+      return;
+    }
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setModalError('Banner image must be JPEG, PNG, or WebP format');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onloadend = () => {
-      setTBannerUrl(reader.result as string);
+      const result = reader.result as string;
+      if (result && result.startsWith('data:image/')) {
+        setTBannerUrl(result);
+        setModalError(null);
+      } else {
+        setModalError('Failed to encode banner image as data URI');
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -682,21 +716,7 @@ export default function AdminDashboardPage() {
                     : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                 }`}
               >
-                💳 DBS UPI (titusalex786@okaxis)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTUpiId('titusalex786-2@okaxis');
-                  setTPaymentQrUrl('/images/qr/titusalex786-2.png');
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-                  tUpiId === 'titusalex786-2@okaxis'
-                    ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow-md'
-                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                }`}
-              >
-                💳 Axis UPI (titusalex786-2@okaxis)
+                💳 Canonical Organiser UPI (titusalex786@okaxis)
               </button>
             </div>
 
@@ -705,6 +725,7 @@ export default function AdminDashboardPage() {
               value={tUpiId}
               onChange={(e) => setTUpiId(e.target.value)}
               placeholder="titusalex786@okaxis"
+              helperText="Single canonical organiser UPI: titusalex786@okaxis"
             />
           </div>
 
@@ -722,10 +743,10 @@ export default function AdminDashboardPage() {
               <div className="flex-1">
                 <label className="cursor-pointer px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition-colors inline-block">
                   Upload Banner Image
-                  <input type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBannerUpload} />
                 </label>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Shown on Home Page & Tournament details screen (Recommended: 1200x500 JPG/PNG)
+                  Shown on Home Page & Tournament details screen (JPEG, PNG, WebP — Max 5 MB)
                 </p>
               </div>
             </div>
@@ -744,8 +765,11 @@ export default function AdminDashboardPage() {
               <div>
                 <label className="cursor-pointer px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition-colors inline-block">
                   Choose Custom QR Image
-                  <input type="file" accept="image/*" className="hidden" onChange={handleQrUpload} />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleQrUpload} />
                 </label>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  JPEG, PNG, WebP — Max 5 MB
+                </p>
               </div>
             </div>
           </div>

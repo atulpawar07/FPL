@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { generateRegistrationReference } from '@/lib/utils/format';
+import { CANONICAL_ORGANISER_UPI_ID } from '@/lib/utils/upi';
 
 export async function GET(
   req: NextRequest,
@@ -94,7 +95,7 @@ export async function GET(
         name: 'FairPlay Premier League 2026',
         registration_fee: 50000,
         payment_enabled: true,
-        upi_id: 'organizer@upi',
+        upi_id: CANONICAL_ORGANISER_UPI_ID,
       },
     });
   } catch (err: any) {

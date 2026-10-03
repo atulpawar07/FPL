@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdmin } from '@/lib/auth/is-admin';
 import { logAdminAction } from '@/lib/audit/logger';
 import { processTournamentImage } from '@/lib/storage/tournament-upload';
+import { validateUPIId, CANONICAL_ORGANISER_UPI_ID } from '@/lib/utils/upi';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -96,6 +97,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const effectiveUpiId = upiId && upiId.trim() ? upiId.trim() : CANONICAL_ORGANISER_UPI_ID;
+    const upiValidation = validateUPIId(effectiveUpiId);
+    if (!upiValidation.isValid) {
+      return NextResponse.json({ error: upiValidation.error }, { status: 400 });
+    }
+
     const tournamentData = {
       name: name.trim(),
       description: description || null,
@@ -107,7 +114,7 @@ export async function POST(req: NextRequest) {
       max_players: capacityInt,
       registration_open: registrationOpen !== undefined ? Boolean(registrationOpen) : true,
       payment_enabled: paymentEnabled !== undefined ? Boolean(paymentEnabled) : true,
-      upi_id: upiId || null,
+      upi_id: effectiveUpiId,
       payment_qr_url: resolvedQrUrl,
       tournament_type: tType,
       max_teams: teamsInt,

@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/auth/is-admin';
 import { logAdminAction } from '@/lib/audit/logger';
 import { deleteTournamentSafely } from '@/lib/tournament/delete';
 import { processTournamentImage } from '@/lib/storage/tournament-upload';
+import { validateUPIId, CANONICAL_ORGANISER_UPI_ID } from '@/lib/utils/upi';
 
 export async function GET(
   req: NextRequest,
@@ -56,8 +57,17 @@ export async function PUT(
     if (body.registrationFee !== undefined) updatePayload.registration_fee = Number(body.registrationFee);
     if (body.maxPlayers !== undefined) updatePayload.max_players = Number(body.maxPlayers);
     if (body.registrationOpen !== undefined) updatePayload.registration_open = Boolean(body.registrationOpen);
-    if (body.paymentEnabled !== undefined) updatePayload.payment_enabled = Boolean(body.paymentEnabled);
-    if (body.upiId !== undefined) updatePayload.upi_id = body.upiId;
+    if (body.upiId !== undefined) {
+      if (body.upiId) {
+        const upiValidation = validateUPIId(body.upiId);
+        if (!upiValidation.isValid) {
+          return NextResponse.json({ error: upiValidation.error }, { status: 400 });
+        }
+        updatePayload.upi_id = body.upiId.trim();
+      } else {
+        updatePayload.upi_id = CANONICAL_ORGANISER_UPI_ID;
+      }
+    }
 
     // Process image fields: base64 → Storage upload → public URL.
     // If either upload fails, return a controlled error — NEVER save raw base64.
