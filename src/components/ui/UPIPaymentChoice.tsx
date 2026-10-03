@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { buildUPIPayURI, sanitizeUPIId, CANONICAL_ORGANISER_UPI_ID } from '@/lib/utils/upi';
+import { buildUPIPayURI, sanitizeUPIId, CANONICAL_ORGANISER_UPI_ID, CANONICAL_QR_IMAGE_PATH } from '@/lib/utils/upi';
 import { generateQRSVGString } from '@/lib/utils/qr';
 import { formatPaiseToINR } from '@/lib/utils/format';
 import { QrCode, Copy, Check, AlertCircle } from 'lucide-react';
@@ -12,7 +12,8 @@ export interface UPIPaymentChoiceProps {
   payeeName?: string;
   amountPaise: number;
   referenceNote?: string;
-  qrUrlFallback?: string | null; // Optional fallback static or CDN image URL if configured
+  qrUrlFallback?: string | null; // Tournament uploaded QR code image URL or local asset path
+  qrImageUrl?: string | null;     // Direct QR image URL alias
 }
 
 export const UPIPaymentChoice: React.FC<UPIPaymentChoiceProps> = ({
@@ -21,6 +22,7 @@ export const UPIPaymentChoice: React.FC<UPIPaymentChoiceProps> = ({
   amountPaise,
   referenceNote = 'FPL Registration',
   qrUrlFallback,
+  qrImageUrl,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -28,8 +30,11 @@ export const UPIPaymentChoice: React.FC<UPIPaymentChoiceProps> = ({
   const isConfigured = Boolean(upiId && upiId.trim());
   const validUpiId = isConfigured ? sanitizeUPIId(upiId) : null;
 
-  // Build canonical UPI payment URI string for QR code generation
-  const canonicalURI = validUpiId
+  // Use the exact QR image uploaded by the tournament owner (or canonical asset), no newly generated QR
+  const tournamentQrImage = qrImageUrl || qrUrlFallback || CANONICAL_QR_IMAGE_PATH;
+
+  // Fallback canonical URI string only if no QR image is available
+  const canonicalURI = !tournamentQrImage && validUpiId
     ? buildUPIPayURI({
         upiId: validUpiId,
         payeeName,
@@ -38,7 +43,7 @@ export const UPIPaymentChoice: React.FC<UPIPaymentChoiceProps> = ({
       })
     : '';
 
-  // Generate SVG QR String from canonical URI
+  // Generate SVG QR String only as secondary fallback if no uploaded image exists
   const qrSvgString = canonicalURI ? generateQRSVGString(canonicalURI) : '';
   const formattedAmount = formatPaiseToINR(amountPaise);
 
@@ -95,16 +100,16 @@ export const UPIPaymentChoice: React.FC<UPIPaymentChoiceProps> = ({
               </p>
             </div>
 
-            {qrSvgString ? (
+            {tournamentQrImage ? (
+              <img
+                src={tournamentQrImage}
+                alt="UPI QR Code"
+                className="w-52 h-52 sm:w-60 sm:h-60 object-contain p-2 bg-white rounded-xl shadow-inner border border-slate-200"
+              />
+            ) : qrSvgString ? (
               <div
                 className="w-52 h-52 sm:w-60 sm:h-60 p-2 bg-white rounded-xl shadow-inner border border-slate-200"
                 dangerouslySetInnerHTML={{ __html: qrSvgString }}
-              />
-            ) : qrUrlFallback ? (
-              <img
-                src={qrUrlFallback}
-                alt="UPI QR Code"
-                className="w-52 h-52 sm:w-60 sm:h-60 object-contain p-2 bg-white rounded-xl shadow-inner border border-slate-200"
               />
             ) : (
               <div className="w-52 h-52 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 font-mono text-center text-xs p-3">
